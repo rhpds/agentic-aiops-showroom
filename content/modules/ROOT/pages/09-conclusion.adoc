@@ -1,0 +1,123 @@
+= Conclusion
+:icons: font
+
+Meridian Financial's compliance window opened on time.
+The FCA auditors received a timestamped incident report — root cause confirmed, cascade timeline documented, remediation approved, audit trail complete.
+The on-call engineer approved the fix from RocketChat in 90 seconds.
+
+You built the system that made that possible.
+
+== What you accomplished
+
+In this workshop, you progressed from understanding a real operational problem to building a production-relevant agentic AI system:
+
+[cols="1,2",options="header"]
+|===
+|Module |Outcome
+
+|1 — The Problem Domain
+|Understood how Ansible Controller failures become Kira tickets and why compliance context changes everything about how you respond
+
+|2 — Your Environment
+|Established connectivity across all platform services and made your first Red Hat MaaS API call
+
+|3 — Your First SRE Agent
+|Built a single-turn LangChain agent with tool use and a structured triage prompt; felt its limits firsthand
+
+|4 — Deep Agents & Subagents
+|Implemented a supervisor/subagent architecture with context isolation; improved root cause quality over single-turn triage
+
+|5 — Compliance & the Human Loop
+|Built risk classification, human approval gates, and a compliance audit trail; understood the OSS vs. Frontier model tradeoff
+
+|6 — Full-Stack Incident Response
+|Orchestrated a multi-ticket cascade investigation across VM and OpenShift layers; measured real MTTR improvement
+|===
+
+== Key concepts to carry forward
+
+*Context isolation is an architecture decision, not an optimization*
+
+Subagents don't share context windows — this is why findings stay clean and supervisor reasoning stays reliable.
+When you design multi-agent systems, think first about context boundaries, not tool lists.
+
+*The prompt is the policy*
+
+`risk_classifier.py` is code, but `prompts/supervisor.txt` is policy.
+The instructions you give an agent — what it must do, must not do, and must ask about — are your compliance surface.
+They require the same governance as any other policy document at Meridian Financial.
+
+*Model selection is a portfolio decision*
+
+You used five different models across six modules.
+No single model is right for every task.
+`gpt-oss-20b` for speed. `gpt-oss-120b` for reasoning. `qwen3-235b` for complex analysis. `gemini-2.5-pro` for long context.
+Red Hat MaaS gives you access to the portfolio; your agent logic makes the selection.
+
+*Autonomy is a spectrum, not a switch*
+
+Human-in, human-on, human-out — these are distinct patterns for distinct risk levels.
+The engineering work is building the classifier that routes correctly.
+The governance work is deciding what goes in each bucket.
+Both matter.
+
+*MTTR improvement comes from the investigation phase, not the execution phase*
+
+Your agent reduced time-to-root-cause and time-to-compliance-report dramatically.
+Remediation execution time (re-running the AAP job) is the same.
+Set expectations accordingly when presenting this to stakeholders.
+
+== References
+
+=== LangChain & Deep Agents
+
+* link:https://python.langchain.com/docs/[LangChain Documentation^]
+* link:https://python.langchain.com/docs/concepts/agents/[LangChain Agents Concepts^]
+* link:https://python.langchain.com/docs/how_to/agent_executor/[AgentExecutor Guide^]
+
+=== Red Hat MaaS & LiteLLM
+
+* link:https://litellm.ai/docs/[LiteLLM Documentation^]
+* link:https://www.redhat.com/en/technologies/cloud-computing/openshift-ai[Red Hat OpenShift AI^]
+
+=== Ansible Automation Platform
+
+* link:https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.5[AAP 2.6 Documentation^]
+* link:https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.5/html/automation_controller_user_guide[Automation Controller User Guide^]
+
+=== OpenShift
+
+* link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.20[OpenShift 4.20 Documentation^]
+
+=== Kira & RocketChat
+
+// TODO: Add links to Kira documentation and internal RocketChat workspace once published
+
+=== Agentic AI patterns (further reading)
+
+* link:https://www.anthropic.com/research/building-effective-agents[Building Effective Agents — Anthropic^]
+* link:https://arxiv.org/abs/2309.07864[ReAct: Reasoning and Acting in Language Models^]
+
+== What's next
+
+This workshop covered the foundations of a production-grade agentic AI incident response system.
+There is significantly more to build:
+
+* *Memory and learning*: agents that remember past incidents and improve triage accuracy over time
+* *Proactive operations*: shift from reactive ticket response to predictive failure detection
+* *Multi-cluster orchestration*: extend `sre_ocp_agent` across multiple OpenShift clusters
+* *Playbook generation*: agent that not only diagnoses but drafts the Ansible fix
+* *Integration with change management*: agent that opens, tracks, and closes change records in your ITSM system
+
+The lab repository at {gitea_url} will continue to evolve.
+Issues, feedback, and contributions welcome via {rocketchat_url} `#lb2645-feedback`.
+
+== Thank you
+
+*Tony Kay, Red Hat* — Principal Architect, Agentic DevOps
+
+*LB 2645 — Red Hat Summit 2026*
+
+Built with: LangChain Deep Agents · Red Hat MaaS · Ansible Automation Platform · OpenShift 4.20 · Kira · RocketChat
+
+// TODO: Add co-authors and contributors before final delivery

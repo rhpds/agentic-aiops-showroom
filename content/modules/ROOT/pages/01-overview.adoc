@@ -1,0 +1,103 @@
+= Workshop overview
+:toc:
+:toc-placement: preamble
+:icons: font
+
+== Your role and mission
+
+You're a senior SRE at *Meridian Financial*, a UK-based financial services firm operating hybrid infrastructure across 140 on-premise RHEL VMs and three OpenShift 4 clusters.
+
+Your team runs 600+ Ansible Automation Platform jobs per week — provisioning, patching, compliance scanning, and configuration drift correction.
+When jobs fail, a ticket lands automatically in *Kira* (Meridian's AI-assisted ticketing system built on your internal tooling) and a notification fires in *RocketChat*.
+
+This week, your manager pulled you aside: "The regulator flagged three SLA breaches in Q1. Each one traced back to a failed Ansible job that sat unactioned too long. We need to close the loop faster — and we need audit evidence that we're doing it. I want you to evaluate whether an agentic AI assistant can help."
+
+*Your assignment*: Design and progressively build an autonomous AI incident response assistant using LangChain's Deep Agents framework.
+It should triage Kira tickets, investigate Ansible Controller job failures against your VM and OpenShift infrastructure, and either resolve them or surface them to the right person — with a full, compliance-ready audit trail.
+
+*The objective*: Demonstrate measurable MTTR reduction and improved SLA adherence for Meridian's operations team.
+
+== Success criteria for your mission
+
+By the end of this workshop, you'll have hands-on experience with agentic AI patterns applicable to real-world SRE operations:
+
+* Triage and classify Ansible Controller failures → automated ticket categorization in Kira
+* Invoke dedicated `sre_` subagents for targeted investigation → faster, more accurate root cause identification
+* Apply human-in/on/out-of-loop patterns → right escalation at the right moment, no more, no less
+* Select and configure models from Red Hat MaaS → optimal cost, capability, and compliance tradeoffs
+* Generate audit-ready incident reports → compliance-friendly output for regulators, automatically
+
+*Technical outcome*: A working agentic AI assistant deployed in your OpenShift namespace, connected to AAP, Kira, and RocketChat.
+
+*Business benefit*: Reduced MTTR, improved SLA adherence, and automatically generated compliance documentation.
+
+== Target audience
+
+This workshop is designed for:
+
+* Platform engineers and SREs who manage Ansible Automation Platform at scale
+* DevOps practitioners evaluating AI augmentation for operations workflows
+* Architects exploring agentic AI patterns for hybrid infrastructure
+* Anyone curious about how LLMs evolve from chatbots to autonomous agents
+
+== Prerequisites
+
+You should have:
+
+* Experience running and troubleshooting Ansible playbooks
+* Familiarity with OpenShift or Kubernetes (namespace, pod, service concepts)
+* Comfort in a Linux terminal (bash; basic Python is helpful but not required)
+* No prior experience with LangChain or large language models required
+
+== Meridian Financial's challenges
+
+*The situation*: Meridian Financial handles ~40 failure tickets per week.
+Each requires manual triage, investigation, and either remediation or escalation — averaging 45 minutes of SRE time per ticket.
+Multiply that across the team, factor in overnight failures and on-call rotations, and you have a systemic operations problem.
+
+*Regulatory context*: As a financial services firm, Meridian operates under strict change management and incident response requirements.
+Every unplanned outage or configuration drift must be documented — root cause, remediation steps, responsible party — within defined SLA windows.
+Missing those windows triggers regulatory penalties.
+
+*Current challenges*:
+
+* *Alert fatigue*: ~40 failure tickets per week, many repeating known patterns → on-call team overwhelmed, slow to respond
+* *Knowledge fragmentation*: Runbooks scattered across Confluence, tribal knowledge siloed in individuals → inconsistent resolution quality
+* *Audit overhead*: Manual incident reports for compliance → 2–3 hours per major incident, often written after the fact
+* *Escalation gap*: Binary choice between "fix it yourself" and "wake someone up" → no graduated, proportional response
+
+*The opportunity*: Agentic AI can triage, investigate, and act — with a full audit trail — while keeping humans appropriately in the loop for high-risk changes.
+
+== Your vision of success
+
+If the agentic assistant proves effective, Meridian projects:
+
+*Immediate improvements* (first 90 days):
+
+* *MTTR reduction*: From 45 min average → target 12 min for known failure patterns
+* *Audit efficiency*: Auto-generated incident reports → compliance team review instead of authoring from scratch
+
+*Strategic benefits* (6–12 months):
+
+* *Scalability*: Handle 10× ticket volume without proportional headcount growth
+* *Knowledge capture*: Agent patterns distill runbook knowledge → self-improving operational knowledge base
+* *Proactive operations*: Shift from reactive ticket response toward predictive failure prevention
+
+*Success metric*: Measurably faster, more consistent incident response that satisfies both the engineering team and the compliance auditors.
+
+== Common questions
+
+*"Is this replacing my team?"*
+→ No. The agent handles mechanical triage and routine investigation, freeing your team for complex judgment calls.
+Module 5 (Compliance & the Human Loop) addresses this directly — including when to keep humans firmly in the loop.
+
+*"What if the AI gets it wrong?"*
+→ You configure human-in-the-loop gates for high-risk actions. The agent proposes; your team approves.
+Module 5 covers guardrails, audit trails, and failure modes.
+
+*"Which model should I use?"*
+→ Red Hat MaaS gives you access to: {litellm_available_models_list}.
+Each module introduces MaaS model selection at the relevant touchpoint. No MaaS UI access is required — all interaction is via API.
+
+*"Do I need to be an AI expert?"*
+→ A strong ops background is all you need. LangChain's Deep Agents framework handles the AI orchestration complexity; you focus on the operational logic and business rules.

@@ -1,0 +1,198 @@
+= Module 1: The Problem Domain
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+It's 03:47 when your phone buzzes.
+Ansible Controller job #4471 — "RHEL baseline compliance scan" — has failed against seven hosts in the `prod-finance-east` group.
+A Kira ticket is open.
+A RocketChat notification is waiting.
+And the SLA clock started ticking the moment the job failed.
+
+This is Tuesday.
+By Friday, auditors from the Financial Conduct Authority arrive to review Meridian Financial's change management and incident response records.
+
+You have seen this before.
+You will see it again.
+The question isn't whether Ansible jobs fail — it's whether your team can respond consistently, quickly, and with a traceable record of every action taken.
+
+In this module, you'll explore the problem domain before touching a single line of agent code.
+Understanding the failure landscape, the ticket lifecycle, and the compliance stakes is what separates a useful AI assistant from a liability.
+
+toc::[]
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Describe the anatomy of an Ansible Controller job failure and its downstream effects
+* Navigate a Kira ticket and identify the key fields an AI agent needs to triage effectively
+* Explain how RocketChat fits into the ChatOps notification loop
+* Articulate the compliance and audit requirements that constrain automated incident response at Meridian Financial
+
+== Exercise 1: Anatomy of a failure
+
+Kira receives structured failure data from Ansible Controller via webhook.
+Before your agent can triage a ticket, you need to understand what that data looks like.
+
+. Login to Kira at {kira_url} using your credentials (`{user}` / `{password}`).
+
+. Find the most recent open ticket. It should look similar to this:
++
+----
+Ticket ID:    KIRA-0042
+Severity:     HIGH
+Source:       Ansible Controller Job #4471
+Job Template: RHEL Baseline Compliance Scan
+Inventory:    prod-finance-east
+Failed Hosts: 7 of 14
+Error Class:  SSH_AUTH_FAILURE
+Error Detail: "Permission denied (publickey)" on rhel-node-[04-10]
+First Seen:   2026-04-07T03:47:22Z
+SLA Deadline: 2026-04-07T05:47:22Z (2h response SLA)
+Status:       OPEN
+Assigned To:  (unassigned)
+----
+
+. Examine the ticket fields. Note which fields would be most useful to an AI agent:
++
+[cols="1,2",options="header"]
+|===
+|Field |Why it matters to an agent
+
+|`Error Class`
+|Allows pattern matching against known failure types without reading full logs
+
+|`Failed Hosts`
+|Scopes the blast radius — 7/14 suggests a partial failure, likely config-related not systemic
+
+|`SLA Deadline`
+|Agent needs to know urgency to prioritize actions and decide whether to escalate immediately
+
+|`Error Detail`
+|Raw signal for root cause — SSH auth failure points to key rotation or credential drift
+|===
+
+=== Verify
+
+Confirm you can see the Kira ticket list and open at least one ticket.
+
+✓ Kira is accessible at {kira_url}
+
+✓ At least one ticket is visible in OPEN status
+
+✓ You can identify the Error Class, Failed Hosts, and SLA Deadline fields
+
+== Exercise 2: The RocketChat notification loop
+
+When Kira creates a ticket, it fires a notification to the `#ops-alerts` channel in RocketChat.
+Your agent will both *read* from this channel (to detect new work) and *write* to it (to post updates and request human decisions).
+
+. Login to RocketChat at {rocketchat_url} using `{user}` / `{password}`.
+
+. Navigate to the `#ops-alerts` channel.
++
+You should see a notification matching the Kira ticket you found in Exercise 1.
+The notification format looks like:
++
+----
+🔴 [KIRA-0042] HIGH — SSH_AUTH_FAILURE
+Job: RHEL Baseline Compliance Scan | Hosts: 7/14 failed
+SLA: 2h response | Deadline: 05:47 UTC
+→ View ticket: {kira_url}/tickets/KIRA-0042
+----
+
+. Note the `#lb2645-agent` channel.
++
+This is where your AI assistant will post its investigation updates, proposed actions, and escalations throughout the workshop.
+
+. Explore the `#lb2645-compliance` channel.
++
+This channel receives audit-trail posts — every action your agent takes is logged here for compliance review.
+
+=== Verify
+
+✓ RocketChat is accessible at {rocketchat_url}
+
+✓ You can see `#ops-alerts`, `#lb2645-agent`, and `#lb2645-compliance` channels
+
+✓ The Kira ticket notification is visible in `#ops-alerts`
+
+== Exercise 3: Inspect the failing Ansible playbook
+
+The Kira ticket points to a specific job template.
+Your agent will need to retrieve the playbook source from Gitea to reason about the failure.
+
+. Login to Gitea at {gitea_url} using `{gitea_username}` / `{gitea_password}`.
+
+. Navigate to the `lb2645-playbooks` repository.
++
+// TODO: Confirm the exact repo name and structure in Gitea
+
+. Open `playbooks/rhel-baseline-compliance.yml`.
++
+Scan the playbook for:
++
+--
+* Which tasks use `ansible.builtin.ssh` or SSH-dependent modules
+* Whether credentials are passed as variables or rely on key-based auth
+* Any `ignore_errors: true` that might mask earlier failures
+--
+
+. Return to the Ansible Controller (accessible via your OpenShift namespace `{aap2_organization}`) and find job run #4471 in the job history.
++
+// TODO: Add AAP console URL pattern once confirmed
+
+. Read the job output for the first failed host.
++
+NOTE: You are doing this manually now. By Module 4, your agent will do this automatically — fetching the job log, parsing the error, and correlating it with the playbook source.
+
+=== Verify
+
+✓ You can browse the `lb2645-playbooks` repository in Gitea
+
+✓ You can locate the failing playbook and identify the SSH-dependent tasks
+
+✓ You can view the Ansible Controller job history and read job output
+
+== Troubleshooting
+
+*Issue*: Kira shows no open tickets
+*Solution*: Your facilitator may need to trigger a test failure. Use RocketChat `#lb2645-support` to request one.
+
+*Issue*: `#lb2645-agent` or `#lb2645-compliance` channels not visible in RocketChat
+*Solution*: These channels may need to be joined manually. Click the search icon in RocketChat and search for `lb2645`.
+
+*Issue*: Gitea repository not found
+*Solution*: Confirm you are logged in as `{gitea_username}`. The `lb2645-playbooks` repo should appear in your user's repository list.
+
+*Issue*: Cannot access Ansible Controller from the browser
+*Solution*: AAP is accessible via your OpenShift namespace. Navigate to {openshift_console_url}, select project `{aap2_organization}`, and look for the AAP route under Networking → Routes.
+
+== Takeaways
+
+*What you observed in this module*:
+
+* Ansible Controller job failures create structured, machine-readable data — error class, host count, SLA deadline — that an AI agent can act on without reading raw logs first
+* Kira provides a normalized view of failures, abstracting away AAP internals and providing the fields an agent needs for triage
+* RocketChat is the human-facing channel for both notifications and agent-human interaction — a critical interface for the human-in-the-loop patterns in Module 5
+* The gap between a failure occurring and a human acting on it is where MTTR accumulates — and where an agent can add immediate value
+
+*The compliance angle*:
+
+At Meridian Financial, every action taken on a production failure must be traceable.
+An AI agent that acts without logging is a compliance liability.
+An agent that logs everything it does — and why — becomes a compliance asset.
+You will build the latter.
+
+*The model question*:
+
+You have access to these models via Red Hat MaaS: {litellm_available_models_list}.
+
+Different tasks call for different models.
+Triage (fast, cheap, pattern matching) is a different workload than root cause analysis (reasoning, context-heavy).
+You'll make these choices explicitly in Modules 3 and 4.
+
+*Next*: Module 2 walks through your full environment — the tools, the topology, and the wiring that connects AAP, Kira, RocketChat, and MaaS into a coherent platform for your agent to operate in.
+
+xref:04-module-02-environment.adoc[→ Module 2: Your Environment]

@@ -1,0 +1,323 @@
+= Module 3: Your First SRE Agent
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+You've seen the problem.
+You've walked the environment.
+Now you build.
+
+Your first agent won't be autonomous — it won't take action without your approval.
+It reads a Kira ticket, calls Red Hat MaaS to triage the error, and posts a structured analysis to RocketChat.
+One input. One model call. One output.
+
+This is intentional.
+The best way to understand what agentic frameworks add is to first feel the boundary of what a single LLM call can do — and where it falls short.
+
+toc::[]
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Structure a LangChain agent with a tool, a prompt, and a model
+* Make a real MaaS inference call against a live Kira ticket
+* Post structured output to RocketChat from your agent
+* Identify where a single-agent, single-turn approach hits its limits
+
+== Exercise 1: Clone the starter code
+
+Your workshop repository in Gitea contains a starter Python project for each module.
+
+[source,bash]
+----
+# Source your environment variables if not already loaded
+source ~/agent-env.sh
+
+# Clone the workshop repository
+git clone {gitea_url}/{gitea_username}/lb2645-agent-workshop.git ~/workshop
+cd ~/workshop
+
+# Verify the directory structure
+ls -la
+----
+
+Expected structure:
+----
+lb2645-agent-workshop/
+├── module-03-first-agent/
+│   ├── agent.py          ← your starting point
+│   ├── tools/
+│   │   ├── kira_tool.py  ← reads Kira tickets
+│   │   └── rocket_tool.py← posts to RocketChat
+│   ├── prompts/
+│   │   └── triage.txt    ← system prompt for triage
+│   └── requirements.txt
+├── module-04-deep-agents/
+├── module-05-compliance/
+└── module-06-advanced/
+----
+
+// TODO: Confirm exact Gitea repo name and structure matches above
+
+[source,bash]
+----
+# Install dependencies for this module
+cd ~/workshop/module-03-first-agent
+pip install -r requirements.txt
+----
+
+=== Verify
+
+✓ Repository cloned without errors
+
+✓ `module-03-first-agent/agent.py` exists
+
+✓ `pip install` completes without dependency errors
+
+== Exercise 2: Examine the starter agent
+
+Open `module-03-first-agent/agent.py` in the Showroom code editor.
+
+[source,python]
+----
+# module-03-first-agent/agent.py
+import os
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from tools.kira_tool import get_open_ticket
+from tools.rocket_tool import post_to_rocketchat
+
+# MaaS uses an OpenAI-compatible API — no special LangChain integration needed
+llm = ChatOpenAI(
+    base_url=os.environ["MAAS_API_BASE"],
+    api_key=os.environ["MAAS_API_KEY"],
+    model="gpt-oss-20b",          # Fast, lightweight — good for triage
+    temperature=0,                 # Deterministic output for consistent triage
+)
+
+tools = [get_open_ticket, post_to_rocketchat]
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", open("prompts/triage.txt").read()),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+if __name__ == "__main__":
+    result = executor.invoke({
+        "input": "Check for the highest-severity open Kira ticket and post a triage analysis to #lb2645-agent in RocketChat."
+    })
+    print(result["output"])
+----
+
+Note what is happening:
+
+. The agent is given two tools — one to read from Kira, one to write to RocketChat
+. The LLM (`gpt-oss-20b` via MaaS) decides which tools to call and in what order
+. The prompt (in `prompts/triage.txt`) gives the agent its persona and constraints
+. `verbose=True` shows you the agent's reasoning — useful for understanding what it's doing
+
+=== Verify
+
+✓ You can open and read `agent.py` in the code editor
+
+✓ You can identify the MaaS model being used and where to change it
+
+✓ You understand the role of each tool in the agent's workflow
+
+== Exercise 3: Read the triage prompt
+
+Open `module-03-first-agent/prompts/triage.txt`.
+
+[source,text]
+----
+You are an SRE assistant at Meridian Financial.
+Your job is to triage infrastructure incident tickets from Kira and provide a structured first-response analysis.
+
+When given a ticket, you must:
+1. Identify the error class and assess its likely root cause based on the error detail
+2. Estimate the blast radius (how many systems are affected and what services they support)
+3. Recommend an immediate action (one of: AUTO_RESOLVE, INVESTIGATE, ESCALATE, MONITOR)
+4. Provide a one-paragraph explanation suitable for posting to the #lb2645-agent RocketChat channel
+
+Output format (strict JSON):
+{
+  "ticket_id": "<KIRA-XXXX>",
+  "error_class": "<class>",
+  "likely_cause": "<one sentence>",
+  "blast_radius": "<brief description>",
+  "recommendation": "<AUTO_RESOLVE|INVESTIGATE|ESCALATE|MONITOR>",
+  "summary": "<one paragraph for RocketChat>"
+}
+
+Rules:
+- ESCALATE immediately if SLA deadline is within 30 minutes
+- ESCALATE immediately if more than 50% of hosts in an inventory have failed
+- AUTO_RESOLVE only for known, low-risk, self-correcting errors (e.g. transient network timeouts)
+- Always include ticket_id in your output
+- Do not take any remediation action — analysis and recommendation only
+----
+
+// TODO: Refine the triage prompt with real error classes from AAP production data
+
+The prompt defines:
+
+* The agent's *persona* and *scope* ("SRE assistant at Meridian Financial")
+* *Structured output format* (JSON) — critical for downstream tools to parse reliably
+* *Hard rules* — conditions that force specific recommendations (compliance guardrails embedded in the prompt)
+
+=== Verify
+
+✓ You can read the triage prompt and explain what each section does
+
+✓ You can identify the two escalation conditions and explain why they exist
+
+== Exercise 4: Run your first agent
+
+[source,bash]
+----
+cd ~/workshop/module-03-first-agent
+
+# Run the agent
+python agent.py
+----
+
+Watch the output carefully.
+With `verbose=True`, LangChain prints each step of the agent's reasoning:
+
+----
+> Entering new AgentExecutor chain...
+
+Invoking: `get_open_ticket` with `{'severity': 'HIGH'}`
+
+{'ticket_id': 'KIRA-0042', 'error_class': 'SSH_AUTH_FAILURE', ...}
+
+Invoking: `post_to_rocketchat` with `{'channel': '#lb2645-agent', 'message': '...'}`
+
+Posted to #lb2645-agent
+
+> Finished chain.
+----
+
+. Check RocketChat `#lb2645-agent`.
++
+Your agent's triage analysis should appear as a formatted message.
+
+. Check the agent's JSON output in the terminal.
++
+Verify the `recommendation` field — does it match what you'd expect for an `SSH_AUTH_FAILURE` on 7/14 hosts?
+
+. Change the model to `gpt-oss-120b` in `agent.py` and re-run.
++
+[source,python]
+----
+model="gpt-oss-120b",   # Larger model — more reasoning capability
+----
++
+Does the triage analysis change? Is the `likely_cause` more specific?
+
+// TODO: Document actual model output differences observed during lab testing
+
+=== Verify
+
+✓ `python agent.py` runs without errors
+
+✓ A triage message appears in RocketChat `#lb2645-agent`
+
+✓ The JSON output includes all required fields: ticket_id, error_class, likely_cause, blast_radius, recommendation, summary
+
+== Exercise 5: Identify the limits
+
+Your first agent works — but it has significant limitations.
+Spend a few minutes testing them:
+
+. *No memory*: Run the agent twice.
++
+Does it remember the ticket it analyzed in the first run?
+What happens if the same ticket is still open?
+
+. *No investigation*: The agent read the Kira ticket fields, but it did not:
++
+--
+* Fetch the actual Ansible Controller job log
+* Read the playbook source from Gitea
+* Check if the affected hosts have had this error before
+* Verify whether the SSH keys on `{rhel_vm_hostname}` are actually missing
+--
++
+Its `likely_cause` is a *guess* based on the error class. Not a root cause.
+
+. *No action*: The agent recommended `INVESTIGATE` but took no investigative action.
++
+A human still has to do the work.
+
+// TODO: Add a structured reflection exercise where learners document the gap between current and target capability
+
+These are not bugs — they are design constraints of a first-generation, single-turn agent.
+Module 4 addresses them with Deep Agents and dedicated subagents.
+
+=== Verify
+
+✓ You can articulate at least three limitations of the single-turn agent
+
+✓ You understand why the `likely_cause` is a guess, not a confirmed root cause
+
+== Troubleshooting
+
+*Issue*: `ModuleNotFoundError: No module named 'langchain'`
+*Solution*: Run `pip install -r requirements.txt` inside `module-03-first-agent/`.
+If the error persists, check your Python version: `python3 --version` should be 3.11+.
+
+*Issue*: `AuthenticationError: 401` from MaaS
+*Solution*: Confirm `$MAAS_API_KEY` is set: `echo $MAAS_API_KEY`.
+If empty, re-run `source ~/agent-env.sh`.
+
+*Issue*: Agent runs but nothing appears in RocketChat
+*Solution*: Confirm `$ROCKETCHAT_URL` is set correctly and the `#lb2645-agent` channel exists.
+Check `tools/rocket_tool.py` to see the posting logic and add a `print()` for debugging.
+
+*Issue*: Agent outputs valid JSON but `recommendation` is always `MONITOR`
+*Solution*: The `gpt-oss-20b` model may be too small for reliable structured JSON output.
+Try `gpt-oss-120b` or add explicit instructions in the prompt: "You MUST output only valid JSON and nothing else."
+
+*Issue*: `get_open_ticket` returns empty / no tickets
+*Solution*: Your facilitator may need to trigger a test failure event.
+Use RocketChat `#lb2645-support` to request one.
+
+== Takeaways
+
+*What you built in this module*:
+
+* A single-turn LangChain agent that reads a Kira ticket, calls Red Hat MaaS, and posts to RocketChat
+* A structured triage prompt that embeds business rules as hard constraints — not suggestions
+* Experience with the LangChain tool-calling pattern: agent decides which tools to call, in what order, based on the goal
+
+*The MaaS touchpoint*:
+
+You called Red Hat MaaS using the OpenAI-compatible API via `ChatOpenAI` with a custom `base_url`.
+This means any LangChain code written for OpenAI works with MaaS without modification — you just change `base_url` and `api_key`.
+You also experienced the first model selection decision: `gpt-oss-20b` for speed, `gpt-oss-120b` for reasoning depth.
+
+*Where single-turn agents break*:
+
+A single LLM call can classify and recommend.
+It cannot investigate, remember, or act.
+The jump from "triage" to "root cause analysis" requires the agent to:
+
+* Fetch and read the Ansible job log (tool call)
+* Pull the playbook from Gitea (tool call)
+* SSH into the RHEL VM to verify SSH key presence (tool call)
+* Reason across all three results (multiple steps)
+* Decide whether to act or escalate (conditional logic)
+
+That's a multi-step, multi-tool, context-accumulating workflow.
+That's what Module 4 introduces.
+
+*Next*: Module 4 upgrades your agent to a Deep Agent architecture with dedicated `sre_` subagents — each specializing in one investigative task, orchestrated by a supervisor agent.
+
+xref:06-module-04-deep-agents.adoc[→ Module 4: Deep Agents & Subagents]

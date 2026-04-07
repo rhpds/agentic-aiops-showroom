@@ -1,18 +1,16 @@
-* xref:index.adoc[What is Showroom?]
+* xref:index.adoc[Welcome]
 
-.Content Developer Guide
-* xref:quick-start.adoc[Quick Start]
-* xref:content-repo.adoc[Creating a Content Repository]
-* xref:agnosticv-config.adoc[AgnosticV Configuration]
-* xref:ui-config.adoc[UI Configuration]
-* xref:user-data.adoc[User Data and Variables]
-* xref:ocp4-role-reference.adoc[OCP4 Role Reference]
-* xref:vm-role-reference.adoc[VM Role Reference]
+.Workshop
+* xref:01-overview.adoc[Overview]
+* xref:02-details.adoc[Details & Setup]
 
-.Showroom Developer Guide
-* xref:architecture.adoc[Architecture]
-* xref:deployer.adoc[Showroom Deployer]
-* xref:images.adoc[Showroom Images]
-* xref:nookbag.adoc[Nookbag UI]
-* xref:ocp-integration.adoc[OCP Integration]
-* xref:contributing.adoc[Contributing]
+.Modules
+* xref:03-module-01-problem-domain.adoc[Module 1: The Problem Domain]
+* xref:04-module-02-environment.adoc[Module 2: Your Environment]
+* xref:05-module-03-first-agent.adoc[Module 3: Your First SRE Agent]
+* xref:06-module-04-deep-agents.adoc[Module 4: Deep Agents & Subagents]
+* xref:07-module-05-compliance-loop.adoc[Module 5: Compliance & the Human Loop]
+* xref:08-module-06-advanced-infra.adoc[Module 6: Full-Stack Incident Response]
+
+.Wrap-up
+* xref:09-conclusion.adoc[Conclusion]

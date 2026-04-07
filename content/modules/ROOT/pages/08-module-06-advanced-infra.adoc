@@ -1,0 +1,319 @@
+= Module 6: Full-Stack Incident Response
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+Three Kira tickets.
+Two infrastructure layers.
+One cascading failure.
+
+Meridian Financial's Friday compliance window starts in four hours.
+The FCA auditors will check change records, incident logs, and remediation evidence.
+Everything must be documented.
+Everything must be traceable.
+
+Your agent knows how to triage. It knows how to investigate. It knows when to ask for help.
+Now it faces the kind of incident that separates a useful tool from a reliable system: a multi-hop failure where fixing one problem reveals another, and the blast radius is unclear until you've dug three layers deep.
+
+In this module, you'll put the full architecture to work — supervisor, subagents, risk classifier, approval gate, audit trail — against a realistic incident scenario.
+You'll also measure what you've built against the MTTR and SLA targets Meridian set at the start.
+
+toc::[]
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Orchestrate a full deep agent investigation across VM and OpenShift infrastructure layers
+* Handle cascading failure scenarios where root cause discovery triggers additional investigations
+* Generate a compliance-ready incident report from agent findings and audit trail data
+* Evaluate the framework's strengths and limitations against the original Meridian Financial requirements
+
+== The scenario: A cascade begins
+
+At 02:15 UTC, three Kira tickets open in rapid succession:
+
+----
+KIRA-0047 | MEDIUM | SSH_AUTH_FAILURE       | prod-finance-east | RHEL VMs 3/12
+KIRA-0048 | HIGH   | OCP_DEPLOYMENT_FAILED  | oc-cluster-01     | payment-processor pod
+KIRA-0049 | HIGH   | ANSIBLE_VARS_MISSING   | prod-finance-east | credentials.yml absent
+----
+
+These look like three separate incidents.
+They are not.
+
+Your agent will discover — as you investigate alongside it — that:
+
+* KIRA-0049 is the root cause: `credentials.yml` was deleted during a playbook refactor pushed to Gitea at 02:09 UTC
+* KIRA-0047 is a downstream effect: SSH auth fails because the key material referenced in `credentials.yml` is no longer accessible to the playbook
+* KIRA-0048 is a further downstream effect: the `payment-processor` deployment in OpenShift failed because its `ConfigMap` is populated by an Ansible job that depends on `credentials.yml`
+
+One deleted file. Three open tickets. Four hours to the compliance window.
+
+// TODO: Set up the actual failure scenario in AAP and Gitea before lab delivery
+// TODO: Confirm OCP namespace and deployment name for the payment-processor scenario
+
+== Exercise 1: Multi-ticket triage
+
+Your supervisor must now handle multiple open tickets simultaneously.
+The starter code in `module-06-advanced/supervisor.py` has been extended to:
+
+. Fetch all open Kira tickets (not just the highest-severity one)
+. Perform initial triage on all tickets to detect potential relationships
+. Group related tickets for coordinated investigation
+
+[source,bash]
+----
+cd ~/workshop/module-06-advanced
+python supervisor.py --triage-all
+----
+
+Expected output:
+----
+📋 Open tickets: KIRA-0047, KIRA-0048, KIRA-0049
+🔍 Triage analysis:
+
+  KIRA-0047 (SSH_AUTH_FAILURE): Likely credential/key access issue
+  KIRA-0048 (OCP_DEPLOYMENT_FAILED): ConfigMap or upstream dependency failure
+  KIRA-0049 (ANSIBLE_VARS_MISSING): Missing credentials.yml — potential root cause
+
+⚠ Correlation detected: All three tickets involve credential or configuration access.
+  Recommending: investigate KIRA-0049 first as potential cascade root.
+
+Proceed with correlated investigation? [y/n]:
+----
+
+. Answer `y` to proceed.
+. Watch the supervisor invoke subagents against KIRA-0049 first.
+
+=== Verify
+
+✓ All three tickets appear in the triage output
+
+✓ The supervisor correctly identifies KIRA-0049 as the likely cascade root
+
+✓ You are prompted before the investigation proceeds (human-on-the-loop for investigation initiation)
+
+== Exercise 2: Correlated investigation
+
+With KIRA-0049 identified as the root cause candidate, the supervisor runs a deeper investigation:
+
+. `sre_playbook_agent` fetches the Gitea commit history for `credentials.yml`:
++
+[source,bash]
+----
+# What the sre_playbook_agent will do internally:
+git -C /tmp/lb2645-playbooks log --oneline -- vars/credentials.yml
+----
++
+Expected finding: "File deleted in commit a3f9c2b at 2026-04-07T02:09:14Z by user-svwr8"
+
+. `sre_job_log_agent` correlates the deletion time with KIRA-0047 and KIRA-0048 ticket open times:
++
+Finding: "KIRA-0047 opened at 02:12 (3 min after deletion). KIRA-0048 opened at 02:15 (6 min after deletion). Timing consistent with cascade."
+
+. `sre_vm_agent` SSHes into `{rhel_vm_hostname}` and checks whether `credentials.yml` content is recoverable from backup:
++
+[source,bash]
+----
+# What the sre_vm_agent will do:
+ssh {rhel_vm_user}@{rhel_vm_hostname} \
+  "ls -la /var/backups/ansible/ 2>/dev/null || echo 'No backup directory found'"
+----
++
+// TODO: Set up actual backup scenario on RHEL VM
+
+. A new subagent is introduced in this module — `sre_ocp_agent`:
++
+[source,python]
+----
+# agents/sre_ocp_agent.py
+# Investigates OpenShift-specific failures using the OC CLI
+# Model: gpt-oss-20b (OC command output is structured — doesn't need large model)
+----
++
+`sre_ocp_agent` checks the `payment-processor` deployment in your OpenShift namespace:
++
+[source,bash]
+----
+oc -n {aap2_organization} describe deployment payment-processor
+oc -n {aap2_organization} get events --sort-by='.lastTimestamp' | tail -10
+----
+
+=== Verify
+
+✓ The supervisor invokes four subagents: job_log, playbook, vm, and ocp
+
+✓ Each subagent returns a finding that contributes to the cascade explanation
+
+✓ The playbook agent identifies the Gitea commit that deleted `credentials.yml`
+
+== Exercise 3: Generate the compliance report
+
+With the cascade confirmed, the supervisor generates a compliance-ready incident report.
+
+[source,bash]
+----
+python supervisor.py --generate-report KIRA-0047 KIRA-0048 KIRA-0049
+----
+
+The report is posted to `#lb2645-compliance` and written to `~/incident-report-$(date +%Y%m%d).md`.
+
+// TODO: Design the exact report format — confirm fields required by Meridian Financial's compliance team
+
+Expected report structure:
+----
+= Incident Report: Credential File Deletion Cascade
+Date: 2026-04-07
+Tickets: KIRA-0047, KIRA-0048, KIRA-0049
+Severity: HIGH
+Affected Systems: prod-finance-east (7 RHEL VMs), oc-cluster-01 (payment-processor)
+
+== Root Cause
+`vars/credentials.yml` deleted from lb2645-playbooks repository at 02:09:14 UTC
+by {gitea_username} in commit a3f9c2b. Deletion was not guarded by a pre-commit
+hook or pipeline validation step.
+
+== Cascade Timeline
+02:09 — credentials.yml deleted (commit a3f9c2b)
+02:12 — KIRA-0047 opened (SSH auth fails, playbook cannot load key material)
+02:15 — KIRA-0048 opened (payment-processor ConfigMap job fails)
+02:15 — KIRA-0049 opened (Ansible reports missing vars file)
+
+== Impact
+- 7/12 RHEL hosts in prod-finance-east unreachable via AAP
+- payment-processor deployment in oc-cluster-01 in CrashLoopBackOff
+- No trading system impact confirmed (payment-processor is non-prod replica)
+
+== Remediation
+Risk classification: HIGH (prod-finance-east restricted environment)
+Approval required before action.
+
+Proposed action: Restore credentials.yml from Gitea history (git revert a3f9c2b)
+and re-run failed AAP jobs.
+
+Approved by: [PENDING]
+
+== Audit Trail
+See #lb2645-compliance for full timestamped agent action log.
+----
+
+=== Verify
+
+✓ Report file is generated at `~/incident-report-*.md`
+
+✓ Report includes the root cause, cascade timeline, and proposed remediation
+
+✓ Report is posted to `#lb2645-compliance`
+
+✓ Remediation status shows PENDING (awaiting human approval — correct for HIGH risk)
+
+== Exercise 4: Measure MTTR
+
+At the start of the workshop, Meridian Financial's target was:
+
+* Current MTTR: 45 minutes average
+* Target MTTR: 12 minutes for known failure patterns
+
+Measure your agent's performance on this scenario:
+
+[source,bash]
+----
+python supervisor.py --measure-mttr KIRA-0047 KIRA-0048 KIRA-0049
+----
+
+// TODO: Implement --measure-mttr flag in supervisor.py
+// Expected output: timestamps from ticket open to root cause identified, proposed action ready
+
+Compare:
+
+[cols="1,1,1",options="header"]
+|===
+|Phase |Manual (estimate) |Agent
+
+|Triage all three tickets
+|15–20 min (engineer woken up, context gathered)
+|< 2 min
+
+|Root cause identification
+|20–30 min (log review, Gitea archaeology)
+|3–5 min (subagent investigation)
+
+|Compliance report draft
+|60–90 min (post-incident writing)
+|< 1 min (generated from audit trail)
+
+|Approval request
+|Manual Slack/email
+|Automated RocketChat gate
+
+|*Total to approval-ready*
+|*~45–60 min*
+|*~8–10 min*
+|===
+
+NOTE: MTTR measurement includes only the time to root cause + approval request.
+Remediation time (re-running the AAP job) is the same whether done manually or agent-assisted.
+The agent doesn't make SSH key rotation faster — it makes the *decision to rotate* faster.
+
+=== Verify
+
+✓ You can articulate which phases of incident response the agent accelerates
+
+✓ You can identify which phases the agent does NOT accelerate (remediation execution, human decision time)
+
+✓ The MTTR measurement aligns with Meridian Financial's target improvement
+
+== Troubleshooting
+
+*Issue*: `sre_ocp_agent` cannot find `payment-processor` deployment
+*Solution*: Confirm the deployment exists in your namespace: `oc -n {aap2_organization} get deployments`.
+If absent, the facilitator may need to trigger the OCP failure scenario.
+
+*Issue*: Gitea commit history doesn't show the credentials.yml deletion
+*Solution*: The test commit may need to be set up before the lab session.
+Use `git log --all -- vars/credentials.yml` in a local clone of the repo.
+If nothing appears, contact your facilitator — the scenario may need to be re-triggered.
+
+*Issue*: Supervisor detects three tickets but doesn't group them as a cascade
+*Solution*: Add a more explicit correlation instruction to `prompts/supervisor.txt`:
+"When multiple tickets open within a 10-minute window, investigate whether they share a common upstream cause before treating them independently."
+
+*Issue*: Incident report is missing the cascade timeline section
+*Solution*: The timeline section requires timestamps from both Gitea (commit time) and Kira (ticket open time).
+Verify both `sre_playbook_agent` and `sre_job_log_agent` return timestamps in their findings.
+Check `prompts/supervisor.txt` to ensure the report prompt asks for a timeline section explicitly.
+
+== Takeaways
+
+*What you demonstrated in this module*:
+
+* Multi-ticket correlation: the agent identified a three-ticket cascade from a single root cause
+* Cross-layer investigation: VM (SSH auth), OpenShift (deployment failure), and source control (Gitea commit) in one coordinated run
+* Automated compliance report generation from agent findings and audit trail data
+* Measurable MTTR improvement — from ~45 minutes to ~8–10 minutes for the investigation and documentation phases
+
+*Honest assessment — where the framework excels*:
+
+* Rapid investigation across heterogeneous data sources (job logs, playbooks, VM state, OCP events)
+* Consistent, repeatable triage logic — no cognitive load variation between 3pm and 3am
+* Automatic audit trail — every agent decision is logged without extra effort
+* Scalable — adding a new infrastructure layer means adding a new subagent, not retraining the whole system
+
+*Honest assessment — where the framework struggles*:
+
+* Novel failure modes: the agent excels at pattern-matching known error classes; genuinely new failure modes require human insight to recognize
+* Tool reliability: each subagent tool call is a potential failure point; brittle tool implementations break the chain
+* Model non-determinism: `temperature=0` helps, but LLMs can still produce different outputs on identical inputs — not ideal for compliance contexts where reproducibility matters
+* Complexity: a four-subagent supervisor with risk classification, approval gates, and compliance logging is a significant system to maintain
+
+*The second-generation agentic difference*:
+
+First-generation agents (chatbots, RAG systems) answer questions.
+Second-generation agents (what you built) *act* — they invoke tools, accumulate state, make decisions, and stop at the right moments.
+The Deep Agents framework provides the orchestration; your job was to provide the operational logic, the compliance rules, and the judgment about when automation is appropriate.
+
+That judgment — encoded in `risk_classifier.py` and `prompts/supervisor.txt` — is the most valuable thing you built.
+Not the code. The decisions.
+
+xref:09-conclusion.adoc[→ Conclusion]
