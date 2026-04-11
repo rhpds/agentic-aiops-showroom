@@ -1,7 +1,7 @@
 ---
 site:
   title: "LB2645: Agentic DevOps"
-  url: https://github.com/rhpds/showroom_template_nookbag
+  url: https://github.com/rhpds/agentic-aiops-showroom
   start_page: modules::index.adoc
 
 content:
