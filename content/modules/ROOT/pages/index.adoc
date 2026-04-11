@@ -1,5 +1,22 @@
 = LB 2645: An Agentic AI DevOps Assistant: Augmenting Incident Response
 
+[IMPORTANT]
+.Your login credentials
+====
+Your username is `{user}` and your password is `{password}`.
+
+Your username follows the format `user-GUID-agentic` — for example, `user-a1b2c3-agentic`.
+
+These credentials work for *all* applications in this workshop: OpenShift, Kira, RocketChat, Gitea, and the Ansible Automation Platform.
+
+To log in to the OpenShift cluster from the terminal, run:
+
+[source,bash,subs="attributes"]
+----
+oc login -u {user} -p {password} {openshift_api_url}
+----
+====
+
 Welcome to the *Agentic AI DevOps Assistant* workshop!
 
 You're a senior SRE at *Meridian Financial*, a financial services firm running hundreds of Ansible Automation Platform jobs per week across hybrid VM and OpenShift infrastructure.
