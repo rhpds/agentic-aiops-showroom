@@ -5,7 +5,7 @@
 ====
 Your username is `{user}` and your password is `{password}`.
 
-Your username follows the format `user-GUID-agentic` — for example, `user-a1b2c3-agentic`.
+Your username follows the format `user-{guid}-agentic`.
 
 These credentials work for *all* applications in this workshop: OpenShift, Kira, RocketChat, Gitea, and the Ansible Automation Platform.
 
