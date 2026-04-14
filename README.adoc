@@ -1,6 +1,9 @@
-= Showroom Template
+= LB2645: Agentic AI DevOps — Showroom Lab
 
-A template for creating Red Hat Showroom lab guides and demo content, built with https://antora.org[Antora].
+This is the Showroom content repo for *LB2645: An Agentic AI DevOps Assistant — Augmenting Incident Response*.
+Participants play a senior SRE at a fictional financial services firm and progressively build an AI-driven incident response assistant using LangChain Deep Agents, Ansible Automation Platform, and Red Hat MaaS — triaging failures, investigating root causes across hybrid infrastructure, and generating compliance-ready audit trails.
+
+Built with https://antora.org[Antora].
 
 == Documentation
 
