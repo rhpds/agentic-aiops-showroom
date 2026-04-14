@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "showroom_summit_2026_lb2465_agentic_ai_ops",
+  "project_id": "8ab0e8d5-1e73-4fc5-878d-7689c81f0375"
+}
