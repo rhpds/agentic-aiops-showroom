@@ -51,27 +51,27 @@ image::tab-bar-01.png[The showroom tab bar,width=100%]
 |===
 |Tab |Console |What it does
 
-|image::lab-and-aap2-01.png[AAP2,150]
+|image::aap2-fullscreen-01.png[AAP2,150]
 |**AAP2**
 |Ansible Automation Platform — where automation jobs run and fail
 
-|image::lab-and-kira-dashboard-01.png[Kira,150]
+|image::kira-fullscreen-01.png[Kira,150]
 |**Kira**
 |Trouble ticketing — where your AI assistant creates structured incident tickets
 
-|image::lab-and-rocketchat-01.png[Rocket.Chat,150]
+|image::rocketchat-fullscreen-01.png[Rocket.Chat,150]
 |**Rocket.Chat**
 |ChatOps — where your AI assistant posts failure notifications
 
-|image::lab-and-gitea-repo-01.png[Gitea,150]
+|image::gitea-fullscreen-01.png[Gitea,150]
 |**Gitea**
 |Source control — hosts the Ansible playbooks behind each job template
 
-|image::lab-and-openshift-console-01.png[OpenShift Console,150]
+|image::openshift-console-fullscreen-01.png[OpenShift Console,150]
 |**OpenShift Console**
 |Cluster management — inspect pods, logs, and configuration
 
-|image::lab-and-openshift-ai-console-01.png[OpenShift AI,150]
+|image::openshift-ai-console-fullscreen-01.png[OpenShift AI,150]
 |**OpenShift AI**
 |Red Hat OpenShift AI dashboard — available for later modules
 
