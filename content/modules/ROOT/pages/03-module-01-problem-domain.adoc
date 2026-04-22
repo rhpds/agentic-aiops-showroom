@@ -12,7 +12,7 @@ Your mission in this workshop: build and evolve an AI-driven incident response a
 
 == Explore AAP2 — Ansible Automation Platform
 
-Click the **AAP2** tab and log in with `{user}` / `{password}`.
+Click the **AAP2** tab and log in with `{user}` / `{password}`
 
 This is where Meridian Financial's automation runs — and where failures originate. Your AI assistant will receive webhooks from AAP2 whenever a job fails.
 
@@ -57,7 +57,7 @@ image::aap2-step-04-jobs.png[AAP2 Jobs list showing the failed seed job,width=10
 
 == Explore Kira — Trouble Ticketing
 
-Click the **Kira** tab and log in with `{user}` / `{password}`.
+Click the **Kira** tab and log in with `{user}` / `{password}`
 
 Kira is the ticketing system where your AI assistant creates structured incident tickets. Think of it as a purpose-built Jira for infrastructure operations.
 
@@ -89,7 +89,7 @@ image::lab-and-kira-dashboard-01.png[Kira dashboard showing the seed ticket,widt
 
 == Explore Rocket.Chat — ChatOps
 
-Click the **Rocket.Chat** tab and log in with `{user}` / `{password}`.
+Click the **Rocket.Chat** tab and log in with `{user}` / `{password}`
 
 Rocket.Chat is the ChatOps notification sink — where the AI assistant posts summaries of failures it has analyzed. In Meridian's environment, this is how the on-call team stays informed without watching dashboards.
 
