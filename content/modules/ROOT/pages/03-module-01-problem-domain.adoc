@@ -4,6 +4,7 @@
 [IMPORTANT]
 .Your login credentials
 ====
+
 Username: `{user}` +
 Password: `{password}`
 
@@ -14,7 +15,6 @@ These credentials work for **every console** in this lab:
 * Rocket.Chat
 * Gitea
 * OpenShift Console
-* Terminal
 ====
 
 == Who you are

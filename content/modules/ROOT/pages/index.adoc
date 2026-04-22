@@ -10,6 +10,7 @@ Your mission: build and evolve an AI-driven incident response assistant that can
 [IMPORTANT]
 .Your login credentials
 ====
+
 Username: `{user}` +
 Password: `{password}`
 
@@ -20,7 +21,6 @@ These credentials work for **every console** in this lab:
 * Rocket.Chat
 * Gitea
 * OpenShift Console
-* Terminal
 ====
 
 == What you'll learn
