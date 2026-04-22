@@ -4,7 +4,6 @@
 [IMPORTANT]
 .Your login credentials
 ====
-
 Username: `{user}` +
 Password: `{password}`
 

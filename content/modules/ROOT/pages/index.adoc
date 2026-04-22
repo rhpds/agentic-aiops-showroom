@@ -10,7 +10,6 @@ Your mission: build and evolve an AI-driven incident response assistant that can
 [IMPORTANT]
 .Your login credentials
 ====
-
 Username: `{user}` +
 Password: `{password}`
 
