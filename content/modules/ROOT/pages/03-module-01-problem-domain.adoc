@@ -1,213 +1,151 @@
 = Module 1: The Problem Domain
 :source-highlighter: rouge
-:toc: macro
-:toclevels: 1
 
 [IMPORTANT]
 .Your login credentials
 ====
 Your username is `{user}` and your password is `{password}`.
 
-These credentials work for *all* applications in this workshop: OpenShift, Kira, RocketChat, Gitea, and the Ansible Automation Platform.
+These credentials work for **every console** in this lab: AAP2, Kira, Rocket.Chat, Gitea, OpenShift Console, and the Terminal.
 
-To log in to the OpenShift cluster from the terminal, run:
+You will use these same credentials throughout the entire workshop.
+====
+
+== Who you are
+
+You are a senior SRE at **Meridian Financial**, a financial services firm running hundreds of Ansible Automation Platform jobs per week across hybrid VM and OpenShift infrastructure.
+
+Overnight job failures are piling up, compliance deadlines are looming, and the on-call team is stretched thin.
+The gap between a failure occurring and a human investigating it is where MTTR accumulates — and where an AI-powered assistant can add immediate value.
+
+Your mission in this workshop: build and evolve an AI-driven incident response assistant that can triage, investigate, and help resolve infrastructure failures — so your team can focus on what matters.
+
+== Connect to OpenShift
+
+Click the **Terminal** tab on the right side of your screen. You'll see two terminal windows.
+
+In either terminal, paste the following command to log in to your OpenShift cluster and switch to your working namespace:
 
 [source,bash,subs="attributes"]
 ----
-oc login -u {user} -p {password} {openshift_api_url}
-----
-====
-
-It's 03:47 when your phone buzzes.
-Ansible Controller job #4471 — "RHEL baseline compliance scan" — has failed against seven hosts in the `prod-finance-east` group.
-A Kira ticket is open.
-A RocketChat notification is waiting.
-And the SLA clock started ticking the moment the job failed.
-
-This is Tuesday.
-By Friday, auditors from the Financial Conduct Authority arrive to review Meridian Financial's change management and incident response records.
-
-You have seen this before.
-You will see it again.
-The question isn't whether Ansible jobs fail — it's whether your team can respond consistently, quickly, and with a traceable record of every action taken.
-
-In this module, you'll explore the problem domain before touching a single line of agent code.
-Understanding the failure landscape, the ticket lifecycle, and the compliance stakes is what separates a useful AI assistant from a liability.
-
-toc::[]
-
-== Learning objectives
-
-By the end of this module, you'll be able to:
-
-* Describe the anatomy of an Ansible Controller job failure and its downstream effects
-* Navigate a Kira ticket and identify the key fields an AI agent needs to triage effectively
-* Explain how RocketChat fits into the ChatOps notification loop
-* Articulate the compliance and audit requirements that constrain automated incident response at Meridian Financial
-
-== Exercise 1: Anatomy of a failure
-
-Kira receives structured failure data from Ansible Controller via webhook.
-Before your agent can triage a ticket, you need to understand what that data looks like.
-
-. Login to Kira at {kira_url} using your credentials (`{user}` / `{password}`).
-
-. Find the most recent open ticket. It should look similar to this:
-+
-----
-Ticket ID:    KIRA-0042
-Severity:     HIGH
-Source:       Ansible Controller Job #4471
-Job Template: RHEL Baseline Compliance Scan
-Inventory:    prod-finance-east
-Failed Hosts: 7 of 14
-Error Class:  SSH_AUTH_FAILURE
-Error Detail: "Permission denied (publickey)" on rhel-node-[04-10]
-First Seen:   2026-04-07T03:47:22Z
-SLA Deadline: 2026-04-07T05:47:22Z (2h response SLA)
-Status:       OPEN
-Assigned To:  (unassigned)
+oc login --insecure-skip-tls-verify \
+  -u {user} \
+  -p {password} \
+  {openshift_api_url} \
+  --namespace user-{guid}-agentic
 ----
 
-. Examine the ticket fields. Note which fields would be most useful to an AI agent:
-+
-[cols="1,2",options="header"]
-|===
-|Field |Why it matters to an agent
+You should see:
 
-|`Error Class`
-|Allows pattern matching against known failure types without reading full logs
-
-|`Failed Hosts`
-|Scopes the blast radius — 7/14 suggests a partial failure, likely config-related not systemic
-
-|`SLA Deadline`
-|Agent needs to know urgency to prioritize actions and decide whether to escalate immediately
-
-|`Error Detail`
-|Raw signal for root cause — SSH auth failure points to key rotation or credential drift
-|===
-
-=== Verify
-
-Confirm you can see the Kira ticket list and open at least one ticket.
-
-✓ Kira is accessible at {kira_url}
-
-✓ At least one ticket is visible in OPEN status
-
-✓ You can identify the Error Class, Failed Hosts, and SLA Deadline fields
-
-== Exercise 2: The RocketChat notification loop
-
-When Kira creates a ticket, it fires a notification to the `#ops-alerts` channel in RocketChat.
-Your agent will both *read* from this channel (to detect new work) and *write* to it (to post updates and request human decisions).
-
-. Login to RocketChat at {rocketchat_url} using `{user}` / `{password}`.
-
-. Navigate to the `#ops-alerts` channel.
-+
-You should see a notification matching the Kira ticket you found in Exercise 1.
-The notification format looks like:
-+
 ----
-🔴 [KIRA-0042] HIGH — SSH_AUTH_FAILURE
-Job: RHEL Baseline Compliance Scan | Hosts: 7/14 failed
-SLA: 2h response | Deadline: 05:47 UTC
-→ View ticket: {kira_url}/tickets/KIRA-0042
+Login successful.
+Using project "user-{guid}-agentic".
 ----
 
-. Note the `#lb2645-agent` channel.
-+
-This is where your AI assistant will post its investigation updates, proposed actions, and escalations throughout the workshop.
+This namespace contains all the services your AI assistant will interact with: Athena, Kira, Rocket.Chat, and more. You can verify with:
 
-. Explore the `#lb2645-compliance` channel.
-+
-This channel receives audit-trail posts — every action your agent takes is logged here for compliance review.
+[source,bash]
+----
+oc get pods
+----
 
-=== Verify
+image::lab-and-ttys-01.png[Terminal tab showing two terminal windows,width=100%]
 
-✓ RocketChat is accessible at {rocketchat_url}
+== Your lab environment
 
-✓ You can see `#ops-alerts`, `#lb2645-agent`, and `#lb2645-compliance` channels
+The tab bar across the top of the right panel gives you access to every console in the lab. Let's walk through each one.
 
-✓ The Kira ticket notification is visible in `#ops-alerts`
+=== AAP2 — Ansible Automation Platform
 
-== Exercise 3: Inspect the failing Ansible playbook
+Click the **AAP2** tab and log in with `{user}` / `{password}`.
 
-The Kira ticket points to a specific job template.
-Your agent will need to retrieve the playbook source from Gitea to reason about the failure.
+This is where automation jobs run — and fail. Your AI assistant will receive webhooks from AAP2 whenever a job fails.
 
-. Login to Gitea at {gitea_url} using `{gitea_username}` / `{gitea_password}`.
+Explore these two screens:
 
-. Navigate to the `lb2645-playbooks` repository.
-+
-// TODO: Confirm the exact repo name and structure in Gitea
+* **Job Templates** (left sidebar) — you'll see 9 numbered job templates (`01 Ping RHEL VM` through `09 System Health Check`). These are the automation tasks that Meridian Financial runs against their infrastructure. Some will succeed, some will fail in ways your agent needs to diagnose.
 
-. Open `playbooks/rhel-baseline-compliance.yml`.
-+
-Scan the playbook for:
-+
---
-* Which tasks use `ansible.builtin.ssh` or SSH-dependent modules
-* Whether credentials are passed as variables or rely on key-based auth
-* Any `ignore_errors: true` that might mask earlier failures
---
+* **Jobs** (left sidebar) — this shows the history of job runs. You may already see a failed job here from the environment setup. This is the data your agent will analyze.
 
-. Return to the Ansible Controller (accessible via your OpenShift namespace `{aap2_organization}`) and find job run #4471 in the job history.
-+
-// TODO: Add AAP console URL pattern once confirmed
+image::lab-and-aap2-01.png[AAP2 console showing job templates and recent jobs,width=100%]
 
-. Read the job output for the first failed host.
-+
-NOTE: You are doing this manually now. By Module 4, your agent will do this automatically — fetching the job log, parsing the error, and correlating it with the playbook source.
+=== Kira — Trouble Ticketing
 
-=== Verify
+Click the **Kira** tab and log in with `{user}` / `{password}`.
 
-✓ You can browse the `lb2645-playbooks` repository in Gitea
+Kira is the ticketing system where your AI assistant creates structured incident tickets. Think of it as a purpose-built Jira for infrastructure operations.
 
-✓ You can locate the failing playbook and identify the SSH-dependent tasks
+You should see the **Dashboard** with:
 
-✓ You can view the Ansible Controller job history and read job output
+* An open ticket count (at least 1 from the seed job)
+* A "Recent Tickets" list showing the ticket title, area, risk, and confidence
+* Charts showing ticket distribution by area and risk
 
-== Troubleshooting
+Click into the ticket to see the full analysis — this was created automatically by the Athena AI agent that's already running in your namespace.
 
-*Issue*: Kira shows no open tickets
-*Solution*: Your facilitator may need to trigger a test failure. Use RocketChat `#lb2645-support` to request one.
+image::lab-and-kira-dashboard-01.png[Kira dashboard showing the seed ticket,width=100%]
 
-*Issue*: `#lb2645-agent` or `#lb2645-compliance` channels not visible in RocketChat
-*Solution*: These channels may need to be joined manually. Click the search icon in RocketChat and search for `lb2645`.
+=== Rocket.Chat — ChatOps
 
-*Issue*: Gitea repository not found
-*Solution*: Confirm you are logged in as `{gitea_username}`. The `lb2645-playbooks` repo should appear in your user's repository list.
+Click the **Rocket.Chat** tab and log in with `{user}` / `{password}`.
 
-*Issue*: Cannot access Ansible Controller from the browser
-*Solution*: AAP is accessible via your OpenShift namespace. Navigate to {openshift_console_url}, select project `{aap2_organization}`, and look for the AAP route under Networking → Routes.
+Rocket.Chat is the ChatOps interface where your AI assistant posts notifications about failures it's analyzed. In a real-world environment, this is how the on-call team stays informed without watching dashboards.
+
+Navigate to the **#support** channel in the left sidebar. You should see a notification from the `aiops` bot matching the ticket you saw in Kira — including the failure summary, risk level, and a direct link to the ticket.
+
+image::lab-and-rocketchat-01.png[Rocket.Chat #support channel with AI-generated notification,width=100%]
+
+=== Gitea — Source Control
+
+Click the **Gitea** tab and log in with `{user}` / `{password}`.
+
+Gitea hosts the Ansible playbooks that AAP2 runs. Your repository `agentic-devops-plays` contains the playbooks behind each of the 9 job templates.
+
+Browse the repository and note the playbook files — these are the automation that fails, and the code your AI agent will need to reference when diagnosing root causes.
+
+image::lab-and-gitea-repo-01.png[Gitea showing the agentic-devops-plays repository,width=100%]
+
+=== OpenShift Console
+
+Click the **OpenShift Console** tab. You may need to log in with `{user}` / `{password}`.
+
+This is the standard OpenShift web console. Your AI assistant (Athena) runs as a pod in your namespace alongside Kira, Rocket.Chat, and the other services. You can use this console to inspect pods, logs, and configuration — useful for debugging later in the workshop.
+
+image::lab-and-openshift-console-01.png[OpenShift Console showing the tenant namespace,width=100%]
+
+=== OpenShift AI
+
+Click the **OpenShift AI** tab. This is the Red Hat OpenShift AI dashboard — available on this cluster but not the primary focus of the early modules. You'll use it in later exercises.
+
+== What's already running
+
+Before you write a single line of code, there's an AI agent already working in your namespace.
+
+**Athena** is an agentic AIOps service that:
+
+1. Listens for failed AAP2 jobs via webhook
+2. Analyzes the failure using specialized SRE sub-agents (one each for Ansible, Linux, OpenShift, and Networking)
+3. Creates a structured ticket in Kira with root cause analysis, confidence score, and recommended action
+4. Posts a notification to the Rocket.Chat `#support` channel
+
+The ticket you saw in Kira and the notification in Rocket.Chat were both created by Athena — automatically, within minutes of a job failing.
+
+In this workshop, you'll explore how Athena works, extend it with new capabilities, and build your own agents using the same patterns.
+
+== The compliance angle
+
+At Meridian Financial, every action taken on a production failure must be traceable. Auditors from the Financial Conduct Authority review change management and incident response records regularly.
+
+An AI agent that acts without logging is a compliance liability. An agent that logs everything it does — and why — becomes a compliance asset. You will build the latter.
 
 == Takeaways
 
-*What you observed in this module*:
+* You are an SRE at Meridian Financial, responsible for investigating and resolving infrastructure failures
+* Your lab has 6 consoles accessible via the tab bar — AAP2, Kira, Rocket.Chat, Gitea, OpenShift Console, and Terminal
+* A single set of credentials (`{user}` / `{password}`) works everywhere
+* An AI agent (Athena) is already running in your namespace, analyzing failures and creating tickets
+* Everything your agent does must be traceable for compliance — this is a constraint, not a nice-to-have
 
-* Ansible Controller job failures create structured, machine-readable data — error class, host count, SLA deadline — that an AI agent can act on without reading raw logs first
-* Kira provides a normalized view of failures, abstracting away AAP internals and providing the fields an agent needs for triage
-* RocketChat is the human-facing channel for both notifications and agent-human interaction — a critical interface for the human-in-the-loop patterns in Module 5
-* The gap between a failure occurring and a human acting on it is where MTTR accumulates — and where an agent can add immediate value
+*Next*: Module 2 digs deeper into your environment — verifying connectivity, exploring the MaaS LLM gateway, and setting up the environment variables your agent code will use.
 
-*The compliance angle*:
-
-At Meridian Financial, every action taken on a production failure must be traceable.
-An AI agent that acts without logging is a compliance liability.
-An agent that logs everything it does — and why — becomes a compliance asset.
-You will build the latter.
-
-*The model question*:
-
-You have access to these models via Red Hat MaaS: {litellm_available_models_list}.
-
-Different tasks call for different models.
-Triage (fast, cheap, pattern matching) is a different workload than root cause analysis (reasoning, context-heavy).
-You'll make these choices explicitly in Modules 3 and 4.
-
-*Next*: Module 2 walks through your full environment — the tools, the topology, and the wiring that connects AAP, Kira, RocketChat, and MaaS into a coherent platform for your agent to operate in.
-
-xref:04-module-02-environment.adoc[→ Module 2: Your Environment]
+xref:04-module-02-environment.adoc[-> Module 2: Your Environment]
