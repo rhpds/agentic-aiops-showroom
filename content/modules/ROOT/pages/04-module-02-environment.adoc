@@ -27,7 +27,9 @@ You'll be taken to the job output screen. Watch the job run — it should fail w
 
 The job output will show a failure in the package installation task. The error is real — the playbook references a package name that doesn't match what's available on the system.
 
-Take note of the error message. In a moment, you'll see the AI agent's analysis of this same error — and compare it to what you'd have done manually.
+Take note of the error message — you can see `"No package apache available"` in the output. In a moment, you'll see the AI agent's analysis of this same error — and compare it to what you'd have done manually.
+
+image::aap2-webserver-job-failed.png[AAP2 job output showing the Install Web Server failure,link=self,width=100%]
 
 == What happens next — inside the Deep Agents pipeline
 
@@ -54,17 +56,25 @@ By now, the pipeline should have completed. Let's verify.
 
 In the **Kira** tab (log in with `{user}` / `{password}` if prompted), you should see a **new ticket** on the dashboard — look for the increased open ticket count and a new entry in the Recent Tickets table.
 
+image::kira-dashboard-web-ticket.png[Kira dashboard showing the new web server failure ticket,link=self,width=100%]
+
 Click into the new ticket. Compare the AI agent's analysis to the error you saw in the AAP2 job output:
 
 * Did it correctly identify the root cause?
 * Is the recommended action specific and actionable?
 * Does the confidence score seem reasonable?
 
+image::kira-web-ticket-detail.png[Kira ticket detail showing the DNF package analysis,link=self,width=100%]
+
 TIP: Use the **AI Chatbot** (bottom right of the ticket screen) if you want to confer with the AI about the analysis — ask it to explain the root cause in more detail, suggest alternative fixes, or clarify any technical terms. Notice you can choose Open Source models of different sizes — these are provided by MaaS and run across various Nvidia and Intel GPUs utilizing Red Hat OpenShift AI and vLLM
+
+image::kira-chatbot-closeup.png[Kira AI chatbot explaining the httpd vs apache package naming,link=self,width=400]
 
 === Check Rocket.Chat
 
 In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), navigate to **#support**. You should see a new notification from the `aiops` bot for this failure — with the job name, classification, and a link to the Kira ticket.
+
+image::rocketchat-two-notifications.png[Rocket.Chat #support channel showing both AI-generated notifications,link=self,width=100%]
 
 == Breaking it down — the subagent definition
 
