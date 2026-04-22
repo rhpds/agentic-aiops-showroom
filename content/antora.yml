@@ -3,3 +3,6 @@ title: "LB 2645: An Agentic AI DevOps Assistant"
 version: ~
 nav:
   - modules/ROOT/nav.adoc
+asciidoc:
+  attributes:
+    guid: antora-yml-won

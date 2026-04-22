@@ -11,14 +11,31 @@ content:
 
 ui:
   bundle:
-    url: https://github.com/rhpds/rhdp_showroom_theme/releases/download/latest/ui-bundle.zip
+    url: https://github.com/rhpds/rhdp_showroom_theme/releases/download/rh-summit-2025/ui-bundle.zip
     snapshot: true
   supplemental_files:
     - path: ./content/supplemental-ui
 
+antora:
+  extensions:
+    - '@sntke/antora-mermaid-extension'
+
 asciidoc:
   attributes:
-    showroom-collection-version: v1.5.2
+    experimental: true
+    page-pagination: true
+    showroom-collection-version: v1.6.8
+    guid: replace-me
+    openshift_console_url: https://console-openshift-console.apps.cluster-GUID.opentlc.com
+    openshift_cluster_ingress_domain: apps.cluster-GUID.opentlc.com
+    aap2_url: https://aap-aap.apps.cluster-GUID.opentlc.com
+    aap2_username: user-GUID-agentic
+    aap2_password: replace-me
+    kira_url: https://kira-frontend-user-GUID-agentic.apps.cluster-GUID.opentlc.com
+    kira_username: user-GUID
+    kira_password: replace-me
+    rocketchat_url: https://rocketchat-user-GUID-agentic.apps.cluster-GUID.opentlc.com
+    athena_url: https://athena-user-GUID-agentic.apps.cluster-GUID.opentlc.com
 
 output:
   dir: ./www
