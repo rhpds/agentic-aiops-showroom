@@ -1,5 +1,12 @@
 = LB 2645: An Agentic AI DevOps Assistant: Augmenting Incident Response
 
+Welcome to the *Agentic AI DevOps Assistant* workshop!
+
+You're a senior SRE at *Meridian Financial*, a financial services firm running hundreds of Ansible Automation Platform jobs per week across hybrid VM and OpenShift infrastructure.
+Overnight job failures are piling up, compliance deadlines are looming, and the on-call team is stretched thin.
+
+Your mission: build and evolve an AI-driven incident response assistant that can triage, investigate, and help resolve infrastructure failures — so your team can focus on what matters.
+
 [IMPORTANT]
 .Your login credentials
 ====
@@ -7,13 +14,6 @@ Your username is `{user}` and your password is `{password}`.
 
 These credentials work for **every console** in this lab: AAP2, Kira, Rocket.Chat, Gitea, OpenShift Console, and the Terminal.
 ====
-
-Welcome to the *Agentic AI DevOps Assistant* workshop!
-
-You're a senior SRE at *Meridian Financial*, a financial services firm running hundreds of Ansible Automation Platform jobs per week across hybrid VM and OpenShift infrastructure.
-Overnight job failures are piling up, compliance deadlines are looming, and the on-call team is stretched thin.
-
-Your mission: build and evolve an AI-driven incident response assistant that can triage, investigate, and help resolve infrastructure failures — so your team can focus on what matters.
 
 == What you'll learn
 
@@ -45,35 +45,44 @@ Before starting this workshop, you should have:
 
 Your lab environment is pre-provisioned with everything you need. Access each service via the **tab bar** at the top of the right panel:
 
-[cols="1,2",options="header"]
-|===
-|Tab |What it does
+image::tab-bar-01.png[The showroom tab bar,width=100%]
 
+[cols="1a,1,2",options="header"]
+|===
+|Tab |Console |What it does
+
+|image::lab-and-aap2-01.png[AAP2,150]
 |**AAP2**
 |Ansible Automation Platform — where automation jobs run and fail
 
+|image::lab-and-kira-dashboard-01.png[Kira,150]
 |**Kira**
 |Trouble ticketing — where your AI assistant creates structured incident tickets
 
+|image::lab-and-rocketchat-01.png[Rocket.Chat,150]
 |**Rocket.Chat**
 |ChatOps — where your AI assistant posts failure notifications
 
+|image::lab-and-gitea-repo-01.png[Gitea,150]
 |**Gitea**
 |Source control — hosts the Ansible playbooks behind each job template
 
+|image::lab-and-openshift-console-01.png[OpenShift Console,150]
 |**OpenShift Console**
 |Cluster management — inspect pods, logs, and configuration
 
+|image::lab-and-openshift-ai-console-01.png[OpenShift AI,150]
 |**OpenShift AI**
 |Red Hat OpenShift AI dashboard — available for later modules
 
+|image::lab-and-ttys-01.png[Terminal,150]
 |**Terminal**
 |Two terminal windows for CLI work (`oc`, `curl`, Python)
 |===
 
 To log in to the OpenShift cluster, click the **Terminal** tab and paste:
 
-[source,bash,subs="attributes"]
+[source,bash,subs=attributes+]
 ----
 oc login --insecure-skip-tls-verify \
   -u {user} \
