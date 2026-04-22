@@ -182,6 +182,6 @@ An AI agent that acts without logging is a compliance liability. An agent that l
 * The Deep Agents pipeline connects all three: failure -> classification -> specialist analysis -> ticket + notification
 * Everything your agent does must be traceable for compliance — this is a constraint, not a nice-to-have
 
-*Next*: Module 2 digs deeper into your environment — verifying connectivity, exploring Red Hat OpenShift AI MaaS (Model as a Service), and setting up the environment variables your agent code will use.
+*Next*: Module 2 — you'll trigger a failure yourself, watch the Deep Agents pipeline analyze it, and break down exactly how the subagent definitions work.
 
-xref:04-module-02-environment.adoc[-> Module 2: Your Environment]
+xref:04-module-02-environment.adoc[-> Module 2: Your First Failure]

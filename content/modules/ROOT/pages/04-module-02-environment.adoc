@@ -1,342 +1,143 @@
-= Module 2: Your Environment
+= Module 2: Your First Failure
 :source-highlighter: rouge
-:toc: macro
-:toclevels: 1
 
-Before you write a single line of agent code, you need to know your platform.
+In Module 1, you explored a ticket that was already waiting for you. Now you're going to trigger a failure yourself, watch the Deep Agents pipeline process it end-to-end, and then break down exactly how it works.
 
-A misconfigured API key, an unreachable service, or a misunderstood topology will cost you more time than any LLM reasoning error.
-In this module, you'll walk every component of your environment — AAP, Gitea, RocketChat, Kira, the RHEL VM target, and your OpenShift namespace — and verify that they connect the way your agent will expect.
+== Launch a failing job
 
-You'll also get your first look at Red Hat MaaS: what models are available, how authentication works, and how your agent will call it — all via API, with no browser UI required.
+=== Step 1: Find the job template
 
-toc::[]
+Click the **AAP2** tab. Navigate to **Automation Execution -> Templates** in the left sidebar.
 
-== Learning objectives
+Find **03 Install Web Server** in the list. This playbook attempts to install a web server package on the RHEL VM — but it has a deliberate error that will cause it to fail.
 
-By the end of this module, you'll be able to:
+=== Step 2: Launch the job
 
-* Describe the topology of your lab environment and how each component connects
-* Verify connectivity to all services your agent will interact with
-* Explain how Red Hat MaaS exposes language models via LiteLLM and how your virtual key controls access
-* Identify the environment variables your agent code will use throughout this workshop
+Click the **rocket icon** (🚀) on the right side of the `03 Install Web Server` row. This launches the job immediately.
 
-== Exercise 1: Map your topology
+You'll be taken to the job output screen. Watch the job run — it should fail within 15-20 seconds.
 
-Your agent operates across five services.
-Understanding how they connect — and where authentication lives — is foundational.
+=== Step 3: Watch it fail
 
-[source,text]
+The job output will show a failure in the package installation task. The error is real — the playbook references a package name that doesn't match what's available on the system.
+
+Take note of the error message. In a moment, you'll see the AI agent's analysis of this same error — and compare it to what you'd have done manually.
+
+== What happens next — inside the Deep Agents pipeline
+
+The job has failed. AAP2 has already fired a webhook. But the AI analysis takes 1-3 minutes to complete — so while you wait, let's walk through exactly what's happening behind the scenes.
+
+[mermaid]
 ----
-                         ┌─────────────────────────────────┐
-                         │     OpenShift Cluster (4.20)     │
-                         │   Namespace: {aap2_organization} │
-                         │                                  │
-   Ansible jobs fail ───►│  Ansible Automation Platform 2.6 │
-                         │         (AAP Controller)         │
-                         │              │                   │
-                         │    webhook   ▼                   │
-                         │        ┌─────────┐               │
-                         │        │  Kira   │◄── Your Agent │
-                         │        │ Tickets │───► Posts     │
-                         │        └─────────┘    updates    │
-                         │              │                   │
-                         │    notify    ▼                   │
-                         │        ┌──────────────┐          │
-                         │        │  RocketChat  │◄── Agent │
-                         │        │  ChatOps     │    posts │
-                         │        └──────────────┘          │
-                         │                                  │
-  Playbook source ───────►  Gitea (source control)          │
-                         │                                  │
-  Ansible targets ───────►  RHEL VM: {rhel_vm_hostname}     │
-                         │                                  │
-                         └─────────────────────────────────┘
-                                        │
-                                        │ LiteLLM API calls
-                                        ▼
-                         ┌─────────────────────────────────┐
-                         │     Red Hat MaaS (LiteLLM)      │
-                         │  {litellm_api_endpoint}         │
-                         │                                  │
-                         │  Available models:               │
-                         │  {litellm_available_models_list} │
-                         └─────────────────────────────────┘
+sequenceDiagram
+    participant AAP2
+    participant Athena as Athena (ops_manager)
+    participant Classifier as Error Classifier
+    participant SRE as sre_linux
+    participant Reviewer
+    participant Kira
+    participant RC as Rocket.Chat
+
+    AAP2->>Athena: Webhook: job failed
+    Athena->>AAP2: Retrieve job output & error
+    Athena->>Classifier: What domain is this?
+    Classifier-->>Athena: linux (confidence: 95%)
+    Athena->>SRE: Analyze this Linux failure
+    SRE->>SRE: Read incident context
+    SRE->>SRE: Root cause analysis
+    SRE-->>Athena: TicketPayload
+    Athena->>Reviewer: Validate ticket quality
+    Reviewer-->>Athena: Approved
+    Athena->>Kira: Create ticket + issues
+    Athena->>RC: Post to #support
 ----
 
-. Review the topology diagram above.
-+
-Identify which services are *inside* your OpenShift namespace and which are *external*.
+Here's what each step does:
 
-. Note the two directions your agent communicates with each service:
-+
-[cols="1,1,1",options="header"]
-|===
-|Service |Agent reads |Agent writes
+. **Webhook fires** — AAP2 sends a POST to Athena's webhook endpoint with the job ID
+. **Retrieve job data** — Athena's `ops_manager` agent calls the AAP2 API to fetch the full job output, error details, and metadata
+. **Classify the failure** — the `error-classifier` skill analyzes the error and determines the domain: is this an Ansible issue, a Linux issue, an OpenShift issue, or a Networking issue?
+. **Delegate to a specialist** — based on the classification, `ops_manager` delegates to the right subagent. For a package installation failure, that's `sre_linux`
+. **Root cause analysis** — `sre_linux` reads the incident context, analyzes the error against its domain knowledge, and produces a structured ticket with root cause, confidence, risk, and recommended action
+. **Quality review** — a lightweight reviewer agent validates the ticket for coherence and actionability
+. **Create ticket** — the structured analysis is submitted to Kira as a ticket with sub-issues
+. **Notify the team** — a summary is posted to the Rocket.Chat `#support` channel
 
-|Kira
-|Open tickets, ticket detail, error fields
-|Status updates, resolution notes, closure
+== Check the results
 
-|RocketChat
-|`#ops-alerts` for new work detection
-|`#lb2645-agent` updates, `#lb2645-compliance` audit posts
+By now, the pipeline should have completed. Let's verify.
 
-|Gitea
-|Playbook source, inventory files, variable files
-|_(read-only in this workshop)_
+=== Check Kira
 
-|AAP Controller
-|Job history, job output logs, inventory
-|_(read-only in this workshop — agent does not re-run jobs)_
+Click the **Kira** tab. You should see a **new ticket** on the dashboard — look for the increased open ticket count and a new entry in the Recent Tickets table.
 
-|MaaS (LiteLLM)
-|Available models list
-|Inference requests (triage, analysis, report generation)
-|===
+Click into the new ticket. Compare the AI agent's analysis to the error you saw in the AAP2 job output:
 
-=== Verify
+* Did it correctly identify the root cause?
+* Is the recommended action specific and actionable?
+* Does the confidence score seem reasonable?
 
-✓ You can describe which services are inside your OpenShift namespace
+=== Check Rocket.Chat
 
-✓ You understand the read/write relationship between your agent and each service
+Click the **Rocket.Chat** tab and navigate to **#support**. You should see a new notification from the `aiops` bot for this failure — with the job name, classification, and a link to the Kira ticket.
 
-== Exercise 2: Verify service connectivity
+== Breaking it down — the subagent definition
 
-From the Showroom terminal, run the full connectivity check:
+The specialist agent that analyzed your failure is defined in a YAML configuration file. Here's the actual `sre_linux` definition:
 
-[source,bash]
+[source,yaml]
 ----
-# 1. OpenShift — confirm namespace access
-oc project {aap2_organization}
-oc get pods
+sre_linux:
+  description: > # <1>
+    Linux specialist. Delegate host-level failures: package manager (dnf/yum),
+    systemd services, SELinux, filesystem/permissions, Satellite content issues.
+  model: claude-sonnet-4-6 # <2>
+  system_prompt: | # <3>
+    You are a senior Linux SRE. You receive incident data from failed AAP2 jobs
+    and perform root-cause analysis on host-level Linux issues.
 
-# 2. Gitea — confirm API access
-curl -s {gitea_url}/api/v1/user \
-  -u {gitea_username}:{gitea_password} \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Gitea user: {d[\"login\"]}')"
+    Always:
+    - Read the incident context (incident.json) first
+    - Check for package manager errors, repo access issues
+    - Look for systemd unit failures, SELinux denials, permission issues
+    - Consider Satellite content view configuration for package availability
+    - Provide specific commands and config changes as recommendations
 
-# 3. Red Hat MaaS — list available models
-curl -s {litellm_api_base_url}/models \
-  -H "Authorization: Bearer {litellm_virtual_key}" \
-  | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-print('Available models:')
-for m in data.get('data', []):
-    print(f'  - {m[\"id\"]}')
-"
-
-# 4. RHEL VM — confirm SSH connectivity (via cluster network)
-ssh -o StrictHostKeyChecking=no \
-    {rhel_vm_user}@{rhel_vm_hostname} \
-    'echo "RHEL VM: $(hostname) — $(uptime -p)"'
+    Use the create-ticket skill to structure your analysis as a TicketPayload.
+    Set area to "linux" for all Linux-domain issues.
+  tools: # <4>
+    - web_search
+  skills: # <5>
+    - ./skills/analyze-linux-failure/
+    - ./skills/create-ticket/
+    - ./skills/common/
 ----
+<1> **Description** — tells the `ops_manager` when to use this subagent. The ops_manager reads all subagent descriptions and picks the best match based on the error classification. Be specific here — vague descriptions lead to misrouting.
+<2> **Model** — which LLM to use from MaaS. `claude-sonnet-4-6` balances capability with cost. For simpler tasks, you could use a smaller model. For complex reasoning, a larger one. This is a key cost/quality tradeoff.
+<3> **System prompt** — the agent's persona and instructions. This is where domain expertise is encoded. Notice it's structured as a role ("You are a senior Linux SRE"), followed by a process ("Always: read context first, check for X, Y, Z"), and an output format instruction ("Use the create-ticket skill"). The quality of this prompt directly determines the quality of the analysis.
+<4> **Tools** — functions the agent can call. `web_search` lets the agent look up documentation or known issues. Tools are the agent's hands — they let it take actions beyond just reasoning.
+<5> **Skills** — markdown documents loaded into the agent's context that provide domain knowledge and output formatting guidance. `analyze-linux-failure` contains Linux-specific diagnostic patterns. `create-ticket` defines the TicketPayload schema. `common` has shared log-parsing techniques. Skills are the agent's reference library — they don't require code, just well-written instructions.
 
-Expected output:
-----
-Now using project "{aap2_organization}" on server "..."
-NAME   READY   STATUS    RESTARTS   AGE
-...
+== The pattern
 
-Gitea user: {gitea_username}
+This is the **Deep Agents** pattern: a manager agent that classifies and delegates, backed by specialist subagents with domain-specific skills. The key insight is that each component is independently configurable:
 
-Available models:
-  - llama-scout-17b
-  - minimax-m2
-  - qwen3-235b
-  - gpt-oss-120b
-  - gpt-oss-20b
-  - gemini-2.5-pro
+* **Add a new domain** — create a new subagent entry in the YAML with its own prompt and skills
+* **Improve analysis quality** — refine the system prompt or add more detailed skills
+* **Control costs** — switch individual subagents to cheaper models for simpler failure types
+* **Add capabilities** — give a subagent new tools (file reading, API calls, database queries)
 
-RHEL VM: rhel — up X minutes
-----
-
-=== Verify
-
-✓ `oc project` returns your namespace without errors
-
-✓ Gitea API returns your username
-
-✓ MaaS lists all six available models
-
-✓ RHEL VM responds to SSH
-
-== Exercise 3: Understand your MaaS access
-
-Red Hat MaaS provides access to language models via a LiteLLM-compatible API.
-Your agent will call this API to perform inference — triage, root cause analysis, report generation — without any browser interaction.
-
-*Your access details*:
-
-[cols="1,2",options="header"]
-|===
-|Setting |Value
-
-|API base URL
-|`{litellm_api_base_url}`
-
-|API endpoint
-|`{litellm_api_endpoint}`
-
-|Your virtual key alias
-|`{litellm_key_alias}`
-
-|Key duration
-|`{litellm_key_duration}` from provisioning
-
-|Available models
-|`{litellm_available_models_list}`
-|===
-
-. Make your first direct model call — a simple test prompt:
-+
-[source,bash]
-----
-curl -s {litellm_api_base_url}/chat/completions \
-  -H "Authorization: Bearer {litellm_virtual_key}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-oss-20b",
-    "messages": [
-      {"role": "user",
-       "content": "In one sentence, what is an SRE?"}
-    ],
-    "max_tokens": 50
-  }' | python3 -c "
-import sys, json
-r = json.load(sys.stdin)
-print(r['choices'][0]['message']['content'])
-"
-----
-
-. Note that `gpt-oss-20b` is the smallest, fastest model — suitable for simple triage tasks.
-+
-Throughout the workshop, you'll use different models for different tasks:
-+
-[cols="1,2",options="header"]
-|===
-|Model |Best used for
-
-|`gpt-oss-20b`
-|Fast triage, classification, simple pattern matching
-
-|`gpt-oss-120b`
-|Root cause analysis, multi-step reasoning, report generation
-
-|`llama-scout-17b`
-|Lightweight tool use, structured output
-
-|`qwen3-235b`
-|Complex reasoning, code analysis, advanced troubleshooting
-
-|`gemini-2.5-pro`
-|Long context (full job logs, large playbooks), multimodal if needed
-
-|`minimax-m2`
-|// TODO: Characterize minimax-m2 use case for this workshop
-|===
-
-NOTE: Your virtual key authorizes access to all listed models. Model selection is a runtime decision made in your agent code — you can switch models per call.
-
-=== Verify
-
-✓ `curl` to MaaS returns a valid JSON response
-
-✓ The model responds with a coherent one-sentence answer
-
-✓ You can see all six models in the MaaS model list
-
-== Exercise 4: Set your environment variables
-
-Your agent code will read configuration from environment variables.
-Set them now so they're available for all subsequent modules.
-
-[source,bash]
-----
-# Create your environment file (do NOT commit this to Gitea)
-cat > ~/agent-env.sh << 'EOF'
-# Red Hat MaaS (LiteLLM)
-export MAAS_API_BASE="{litellm_api_base_url}"
-export MAAS_API_KEY="{litellm_virtual_key}"
-
-# Kira ticket system
-export KIRA_URL="{kira_url}"
-export KIRA_USER="{user}"
-export KIRA_PASSWORD="{password}"
-
-# RocketChat
-export ROCKETCHAT_URL="{rocketchat_url}"
-export ROCKETCHAT_USER="{user}"
-export ROCKETCHAT_PASSWORD="{password}"
-
-# Gitea
-export GITEA_URL="{gitea_url}"
-export GITEA_USER="{gitea_username}"
-export GITEA_PASSWORD="{gitea_password}"
-
-# AAP
-export AAP_ORG="{aap2_organization}"
-export AAP_USER="{aap2_username}"
-export AAP_PASSWORD="{aap2_password}"
-
-# RHEL VM
-export RHEL_HOST="{rhel_vm_hostname}"
-export RHEL_USER="{rhel_vm_user}"
-export RHEL_PASSWORD="{rhel_vm_password}"
-EOF
-
-# Load variables into your current session
-source ~/agent-env.sh
-
-# Verify
-echo "MaaS base: $MAAS_API_BASE"
-echo "Kira URL:  $KIRA_URL"
-echo "AAP org:   $AAP_ORG"
-----
-
-IMPORTANT: The `agent-env.sh` file contains credentials. It is created in your home directory on the Showroom terminal and is not persisted to Gitea. Do not share it or commit it.
-
-=== Verify
-
-✓ `agent-env.sh` is created and sourced without errors
-
-✓ `echo $MAAS_API_BASE` returns `{litellm_api_base_url}`
-
-✓ `echo $KIRA_URL` returns `{kira_url}`
-
-== Troubleshooting
-
-*Issue*: `curl` to MaaS returns `401 Unauthorized`
-*Solution*: Your virtual key may have expired (keys are valid for {litellm_key_duration}).
-Contact your facilitator for a new key.
-
-*Issue*: SSH to RHEL VM times out
-*Solution*: The RHEL VM is accessible only from within the cluster network via the Showroom terminal.
-Confirm you are using the Showroom terminal, not a local terminal.
-Hostname: `{rhel_vm_hostname}`.
-
-*Issue*: `oc get pods` returns nothing
-*Solution*: Some pods may not be running yet if your environment was recently provisioned.
-Wait 2 minutes and retry. If still empty, run `oc get all` to see what exists.
-
-*Issue*: Gitea returns `{"errors":[{"message":"...","locations":[...]}]}`
-*Solution*: You may be hitting the API at a GraphQL endpoint. Use the REST API path `/api/v1/user` as shown in the exercise.
+You don't need to modify any code to do any of this. The YAML configuration and skill markdown files are all you need to change — and in a later module, you'll do exactly that.
 
 == Takeaways
 
-*What you established in this module*:
+* You triggered a real failure and watched the AI pipeline analyze it end-to-end
+* The pipeline takes 1-3 minutes: webhook -> classification -> specialist analysis -> ticket + notification
+* Each subagent is defined in YAML: description, model, system prompt, tools, and skills
+* The system prompt encodes domain expertise — it's the most important part of the subagent definition
+* Skills are markdown documents that provide reference knowledge — no code required
+* The pattern is extensible: new domains, better prompts, different models, additional tools
 
-* Your agent operates across five services: AAP, Kira, RocketChat, Gitea, and Red Hat MaaS
-* Red Hat MaaS provides access to six models via the LiteLLM API — no browser access needed
-* Model selection is a deliberate choice: small/fast for triage, large/capable for reasoning, long-context for full log analysis
-* Environment variables are the clean, portable way to configure your agent — and keeping credentials out of source control is non-negotiable
+*Next*: Module 3 — you'll build your first SRE agent from scratch using the same patterns.
 
-*The MaaS advantage*:
-
-In a regulated environment like Meridian Financial, using externally hosted commercial AI APIs creates data residency and privacy risks — job logs may contain hostnames, credentials, and system topology.
-Red Hat MaaS runs within Red Hat's infrastructure, giving you access to both OSS and Frontier models through a single, governed API endpoint with per-user key management and usage tracking.
-
-*Next*: Module 3 puts everything together — you'll write your first SRE agent that reads a Kira ticket, calls MaaS for triage analysis, and posts the result to RocketChat.
-
-xref:05-module-03-first-agent.adoc[→ Module 3: Your First SRE Agent]
+xref:05-module-03-first-agent.adoc[-> Module 3: Your First SRE Agent]
