@@ -2,7 +2,6 @@
 
 .Workshop
 * xref:01-overview.adoc[Overview]
-* xref:02-details.adoc[Details & Setup]
 
 .Modules
 * xref:03-module-01-problem-domain.adoc[Module 1: The Problem Domain]
@@ -14,3 +13,4 @@
 
 .Wrap-up
 * xref:09-conclusion.adoc[Conclusion]
+* xref:02-details.adoc[Details & Setup]
