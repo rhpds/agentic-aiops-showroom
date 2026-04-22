@@ -5,14 +5,7 @@
 ====
 Your username is `{user}` and your password is `{password}`.
 
-These credentials work for *all* applications in this workshop: OpenShift, Kira, RocketChat, Gitea, and the Ansible Automation Platform.
-
-To log in to the OpenShift cluster from the terminal, run:
-
-[source,bash,subs="attributes"]
-----
-oc login -u {user} -p {password} {openshift_api_url}
-----
+These credentials work for **every console** in this lab: AAP2, Kira, Rocket.Chat, Gitea, OpenShift Console, and the Terminal.
 ====
 
 Welcome to the *Agentic AI DevOps Assistant* workshop!
@@ -50,20 +43,44 @@ Before starting this workshop, you should have:
 
 == Workshop environment
 
-Your lab environment is pre-provisioned and includes:
+Your lab environment is pre-provisioned with everything you need. Access each service via the **tab bar** at the top of the right panel:
 
-* *OpenShift cluster* (OCP 4.20): {openshift_console_url}
-* *Ansible Automation Platform 2.6*: accessible via namespace `{aap2_organization}`
-* *Gitea* (source code): {gitea_url}
-* *RocketChat* (ChatOps + ticket notifications): {rocketchat_url}
-* *Kira* (AI-assisted ticket system): {kira_url}
-* *Red Hat MaaS* (LiteLLM API): {litellm_api_endpoint}
-* *RHEL VM* (Ansible target): `{rhel_vm_hostname}`
+[cols="1,2",options="header"]
+|===
+|Tab |What it does
 
-Your credentials:
+|**AAP2**
+|Ansible Automation Platform — where automation jobs run and fail
 
-* *Username*: `{user}`
-* *Password*: `{password}`
+|**Kira**
+|Trouble ticketing — where your AI assistant creates structured incident tickets
+
+|**Rocket.Chat**
+|ChatOps — where your AI assistant posts failure notifications
+
+|**Gitea**
+|Source control — hosts the Ansible playbooks behind each job template
+
+|**OpenShift Console**
+|Cluster management — inspect pods, logs, and configuration
+
+|**OpenShift AI**
+|Red Hat OpenShift AI dashboard — available for later modules
+
+|**Terminal**
+|Two terminal windows for CLI work (`oc`, `curl`, Python)
+|===
+
+To log in to the OpenShift cluster, click the **Terminal** tab and paste:
+
+[source,bash,subs="attributes"]
+----
+oc login --insecure-skip-tls-verify \
+  -u {user} \
+  -p {password} \
+  {openshift_api_url} \
+  --namespace user-{guid}-agentic
+----
 
 NOTE: All environment details and credentials are shown in the lab interface. You do not need to install anything locally.
 
@@ -75,4 +92,4 @@ Work at your own pace — your environment stays active throughout the session.
 
 == Let's get started!
 
-Click *Workshop Overview* in the navigation to begin.
+xref:03-module-01-problem-domain.adoc[-> Module 1: The Problem Domain]
