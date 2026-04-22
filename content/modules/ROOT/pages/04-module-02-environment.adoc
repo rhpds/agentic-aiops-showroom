@@ -11,9 +11,15 @@ Click the **AAP2** tab. Navigate to **Automation Execution -> Templates** in the
 
 Find **03 Install Web Server** in the list. This playbook attempts to install a web server package on the RHEL VM — but it has a deliberate error that will cause it to fail.
 
+image::aap2-web-server-job-template.png[AAP2 templates list with 03 Install Web Server highlighted,width=100%]
+
 === Step 2: Launch the job
 
-Click the **rocket icon** (🚀) on the right side of the `03 Install Web Server` row. This launches the job immediately.
+Each job template row has three action icons on the right:
+
+image::aap2-icons.png[AAP2 action icons — rocket launch and edit pencil and kebab menu,width=80]
+
+Click the **rocket icon** image:aap2-rocket-icon.png[rocket icon,20] on the `03 Install Web Server` row to launch the job immediately.
 
 You'll be taken to the job output screen. Watch the job run — it should fail within 15-20 seconds.
 
