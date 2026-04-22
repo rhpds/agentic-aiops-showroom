@@ -95,7 +95,7 @@ oc login --insecure-skip-tls-verify \
   -u {user} \
   -p {password} \
   {openshift_api_url} \
-  --namespace user-{guid}-agentic
+  --namespace {user}-agentic
 ----
 
 NOTE: All environment details and credentials are shown in the lab interface. You do not need to install anything locally.

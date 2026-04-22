@@ -37,14 +37,14 @@ oc login --insecure-skip-tls-verify \
   -u {user} \
   -p {password} \
   {openshift_api_url} \
-  --namespace user-{guid}-agentic
+  --namespace {user}-agentic
 ----
 
 You should see:
 
 ----
 Login successful.
-Using project "user-{guid}-agentic".
+Using project "{user}-agentic".
 ----
 
 This namespace contains all the services your AI assistant will interact with: Athena, Kira, Rocket.Chat, and more. You can verify with:
