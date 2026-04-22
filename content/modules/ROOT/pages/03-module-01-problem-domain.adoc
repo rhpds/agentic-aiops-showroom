@@ -16,23 +16,44 @@ Click the **AAP2** tab and log in with `{user}` / `{password}`.
 
 This is where Meridian Financial's automation runs — and where failures originate. Your AI assistant will receive webhooks from AAP2 whenever a job fails.
 
-=== Job Templates
+=== Step 1: Open the sidebar
 
-Click **Job Templates** in the left sidebar.
+After logging in, you'll see the AAP2 dashboard. If the left sidebar is collapsed, click the **hamburger menu** (three horizontal lines) in the top left to expand it. Then click **Automation Execution** to reveal the navigation options.
+
+image::aap2-step-01-dashboard.png[AAP2 dashboard with sidebar and Automation Execution highlighted,width=100%]
+
+=== Step 2: Find Jobs and Templates
+
+With the **Automation Execution** section expanded, you'll see two key menu items:
+
+* **Jobs** — the execution history of every job that has run
+* **Templates** — the job templates that define what automation can be launched
+
+These are the two screens you'll use most in this workshop.
+
+image::aap2-step-02-nav-expanded.png[AAP2 sidebar showing Jobs and Templates,width=100%]
+
+=== Step 3: Explore Job Templates
+
+Click **Templates** in the sidebar.
 
 You'll see 9 numbered job templates — `01 Ping RHEL VM` through `09 System Health Check`. These represent the day-to-day automation that Meridian's SRE team runs against their infrastructure: health checks, package updates, application deployments, and compliance scans.
 
 Each template is wired to a playbook in Gitea. Some will succeed. Some will fail in specific, diagnosable ways — and those failures are what your AI assistant needs to handle.
 
-image::lab-and-aap2-01.png[AAP2 console showing job templates and recent jobs,width=100%]
+Notice the ordering — they progress from simple (a basic ping) to complex (a health check using a custom execution environment). You'll work through these failures throughout the workshop.
 
-=== Jobs
+image::aap2-step-03-templates.png[AAP2 showing all 9 numbered job templates,width=100%]
 
-Click **Jobs** in the left sidebar.
+=== Step 4: Check the Jobs history
 
-This is the execution history — every time a job template runs, it appears here. Notice that one job has already **failed**. This is not an accident — the environment automatically ran a job during provisioning so you'd have something to investigate.
+Click **Jobs** in the sidebar.
+
+This is the execution history — every time a job template runs, it appears here. Notice that one job has already **failed** (shown with a red "Failed" status). This is not an accident — the environment automatically ran a job during provisioning so you'd have something to investigate.
 
 That failed job triggered a chain of events that you're about to trace through Kira and Rocket.Chat.
+
+image::aap2-step-04-jobs.png[AAP2 Jobs list showing the failed seed job,width=100%]
 
 == Explore Kira — Trouble Ticketing
 
