@@ -134,7 +134,7 @@ image::rocketchat-step-02-support.png[Rocket.Chat #support channel with AI-gener
 
 You've now seen three pieces of the puzzle: a failed job in AAP2, a ticket in Kira, and a notification in Rocket.Chat. But how did that happen? Here's the flow:
 
-image::deep-agents-pipeline-flow.svg[Deep Agents pipeline flow — click to enlarge,align="center",link=self,window=blank,width=700]
+image::deep-agents-pipeline-flow.svg[Deep Agents pipeline flow — click to enlarge,align="center",link=self,width=700]
 
 This is the **Deep Agents** pattern in action:
 

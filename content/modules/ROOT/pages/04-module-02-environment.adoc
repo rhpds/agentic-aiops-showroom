@@ -33,7 +33,7 @@ Take note of the error message. In a moment, you'll see the AI agent's analysis 
 
 The job has failed. AAP2 has already fired a webhook. But the AI analysis takes 1-3 minutes to complete — so while you wait, let's walk through exactly what's happening behind the scenes.
 
-image::deep-agents-pipeline-sequence.svg[Deep Agents pipeline sequence diagram — click to enlarge,align="center",link=self,window=blank,width=700]
+image::deep-agents-pipeline-sequence.svg[Deep Agents pipeline sequence diagram — click to enlarge,align="center",link=self,width=700]
 
 Here's what each step does:
 
