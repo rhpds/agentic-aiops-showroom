@@ -1,21 +1,6 @@
 = Module 1: The Problem Domain
 :source-highlighter: rouge
 
-[IMPORTANT]
-.Your login credentials
-====
-Username: `{user}` +
-Password: `{password}`
-
-These credentials work for **every console** in this lab:
-
-* AAP2
-* Kira
-* Rocket.Chat
-* Gitea
-* OpenShift Console
-====
-
 == Who you are
 
 You are a senior SRE at **Meridian Financial**, a financial services firm running hundreds of Ansible Automation Platform jobs per week across hybrid VM and OpenShift infrastructure.
@@ -25,117 +10,110 @@ The gap between a failure occurring and a human investigating it is where MTTR a
 
 Your mission in this workshop: build and evolve an AI-driven incident response assistant that can triage, investigate, and help resolve infrastructure failures — so your team can focus on what matters.
 
-== Connect to OpenShift
-
-Click the **Terminal** tab on the right side of your screen. You'll see two terminal windows.
-
-In either terminal, paste the following command to log in to your OpenShift cluster and switch to your working namespace:
-
-[source,bash,role="execute",subs=attributes+]
-----
-oc login --insecure-skip-tls-verify \
-  -u {user} \
-  -p {password} \
-  {openshift_api_url} \
-  --namespace {user}-agentic
-----
-
-You should see:
-
-----
-Login successful.
-Using project "{user}-agentic".
-----
-
-This namespace contains all the services your AI assistant will interact with: Athena, Kira, Rocket.Chat, and more. You can verify with:
-
-[source,bash]
-----
-oc get pods
-----
-
-image::lab-and-ttys-01.png[Terminal tab showing two terminal windows,width=100%]
-
-== Your lab environment
-
-The tab bar across the top of the right panel gives you access to every console in the lab. Let's walk through each one.
-
-=== AAP2 — Ansible Automation Platform
+== Explore AAP2 — Ansible Automation Platform
 
 Click the **AAP2** tab and log in with `{user}` / `{password}`.
 
-This is where automation jobs run — and fail. Your AI assistant will receive webhooks from AAP2 whenever a job fails.
+This is where Meridian Financial's automation runs — and where failures originate. Your AI assistant will receive webhooks from AAP2 whenever a job fails.
 
-Explore these two screens:
+=== Job Templates
 
-* **Job Templates** (left sidebar) — you'll see 9 numbered job templates (`01 Ping RHEL VM` through `09 System Health Check`). These are the automation tasks that Meridian Financial runs against their infrastructure. Some will succeed, some will fail in ways your agent needs to diagnose.
+Click **Job Templates** in the left sidebar.
 
-* **Jobs** (left sidebar) — this shows the history of job runs. You may already see a failed job here from the environment setup. This is the data your agent will analyze.
+You'll see 9 numbered job templates — `01 Ping RHEL VM` through `09 System Health Check`. These represent the day-to-day automation that Meridian's SRE team runs against their infrastructure: health checks, package updates, application deployments, and compliance scans.
+
+Each template is wired to a playbook in Gitea. Some will succeed. Some will fail in specific, diagnosable ways — and those failures are what your AI assistant needs to handle.
 
 image::lab-and-aap2-01.png[AAP2 console showing job templates and recent jobs,width=100%]
 
-=== Kira — Trouble Ticketing
+=== Jobs
+
+Click **Jobs** in the left sidebar.
+
+This is the execution history — every time a job template runs, it appears here. Notice that one job has already **failed**. This is not an accident — the environment automatically ran a job during provisioning so you'd have something to investigate.
+
+That failed job triggered a chain of events that you're about to trace through Kira and Rocket.Chat.
+
+== Explore Kira — Trouble Ticketing
 
 Click the **Kira** tab and log in with `{user}` / `{password}`.
 
 Kira is the ticketing system where your AI assistant creates structured incident tickets. Think of it as a purpose-built Jira for infrastructure operations.
 
-You should see the **Dashboard** with:
+=== Dashboard
 
-* An open ticket count (at least 1 from the seed job)
-* A "Recent Tickets" list showing the ticket title, area, risk, and confidence
-* Charts showing ticket distribution by area and risk
+The dashboard gives you the operational overview:
 
-Click into the ticket to see the full analysis — this was created automatically by the Athena AI agent that's already running in your namespace.
+* **Open tickets** — at least 1 should be open from the failed job
+* **Tickets by Area** — categorized by domain (linux, kubernetes, networking, application)
+* **Risk Distribution** — how severe the AI agent assessed each failure to be
+* **Avg Confidence** — how confident the agent is in its analysis
+
+=== Ticket detail
+
+Click into the open ticket in the **Recent Tickets** table.
+
+This ticket was created automatically by the Athena AI agent running in your namespace. Look at the fields:
+
+* **Title** — a human-readable summary of the failure
+* **Area** — the domain the agent classified this failure into
+* **Confidence** — how sure the agent is about its analysis (0-100%)
+* **Risk** — the assessed severity (critical, high, medium, low)
+* **Description** — the agent's root cause analysis with evidence from the job output
+* **Recommended Action** — specific steps to fix the issue
+
+This is what an AI-generated incident ticket looks like. Your job in this workshop is to understand how it got here — and how to make it better.
 
 image::lab-and-kira-dashboard-01.png[Kira dashboard showing the seed ticket,width=100%]
 
-=== Rocket.Chat — ChatOps
+== Explore Rocket.Chat — ChatOps
 
 Click the **Rocket.Chat** tab and log in with `{user}` / `{password}`.
 
-Rocket.Chat is the ChatOps interface where your AI assistant posts notifications about failures it's analyzed. In a real-world environment, this is how the on-call team stays informed without watching dashboards.
+Rocket.Chat is the ChatOps notification sink — where the AI assistant posts summaries of failures it has analyzed. In Meridian's environment, this is how the on-call team stays informed without watching dashboards.
 
-Navigate to the **#support** channel in the left sidebar. You should see a notification from the `aiops` bot matching the ticket you saw in Kira — including the failure summary, risk level, and a direct link to the ticket.
+NOTE: In your environment, this is Rocket.Chat. In production, this could just as easily be Slack, Microsoft Teams, or any webhook-capable messaging platform. The pattern is the same — the AI agent posts structured notifications to a channel that humans monitor.
+
+Navigate to the **#support** channel in the left sidebar. You should see a notification from the `aiops` bot matching the ticket you saw in Kira — including the failure summary, risk level, confidence, and a direct link to the ticket.
 
 image::lab-and-rocketchat-01.png[Rocket.Chat #support channel with AI-generated notification,width=100%]
 
-=== Gitea — Source Control
+== How it all connects
 
-Click the **Gitea** tab and log in with `{user}` / `{password}`.
+You've now seen three pieces of the puzzle: a failed job in AAP2, a ticket in Kira, and a notification in Rocket.Chat. But how did that happen? Here's the flow:
 
-Gitea hosts the Ansible playbooks that AAP2 runs. Your repository `agentic-devops-plays` contains the playbooks behind each of the 9 job templates.
+[mermaid]
+----
+flowchart TD
+    A[AAP2 Job Fails] --> B[Webhook Fires]
+    B --> C[Athena Deep Agent Catches Webhook]
+    C --> D[Retrieves Job Error from AAP2]
+    D --> E[Classifies Failure Domain]
+    E --> F{Which domain?}
+    F -->|Ansible| G[sre_ansible]
+    F -->|Linux| H[sre_linux]
+    F -->|OpenShift| I[sre_openshift]
+    F -->|Networking| J[sre_networking]
+    G --> K[Root Cause Analysis]
+    H --> K
+    I --> K
+    J --> K
+    K --> L[Creates Ticket in Kira]
+    L --> M[Posts Notification to Rocket.Chat]
+----
 
-Browse the repository and note the playbook files — these are the automation that fails, and the code your AI agent will need to reference when diagnosing root causes.
+This is the **Deep Agents** pattern in action:
 
-image::lab-and-gitea-repo-01.png[Gitea showing the agentic-devops-plays repository,width=100%]
+1. **AAP2 job fails** — a playbook encounters an error during execution
+2. **Webhook fires** — AAP2 sends a failure notification to Athena's webhook endpoint
+3. **Athena catches the webhook** — retrieves the full job output and error details from the AAP2 API
+4. **Classifies the failure** — determines whether this is an Ansible, Linux, OpenShift, or Networking issue
+5. **Delegates to a specialist** — spins up the appropriate `sre_` subagent (e.g., `sre_linux` for a package issue)
+6. **Root cause analysis** — the specialist agent analyzes the error, reads the playbook, and identifies the cause
+7. **Creates a ticket** — structured ticket in Kira with title, area, confidence, risk, and recommended action
+8. **Notifies the team** — posts a summary to the Rocket.Chat `#support` channel
 
-=== OpenShift Console
-
-Click the **OpenShift Console** tab. You may need to log in with `{user}` / `{password}`.
-
-This is the standard OpenShift web console. Your AI assistant (Athena) runs as a pod in your namespace alongside Kira, Rocket.Chat, and the other services. You can use this console to inspect pods, logs, and configuration — useful for debugging later in the workshop.
-
-image::lab-and-openshift-console-01.png[OpenShift Console showing the tenant namespace,width=100%]
-
-=== OpenShift AI
-
-Click the **OpenShift AI** tab. This is the Red Hat OpenShift AI dashboard — available on this cluster but not the primary focus of the early modules. You'll use it in later exercises.
-
-== What's already running
-
-Before you write a single line of code, there's an AI agent already working in your namespace.
-
-**Athena** is an agentic AIOps service that:
-
-1. Listens for failed AAP2 jobs via webhook
-2. Analyzes the failure using specialized SRE sub-agents (one each for Ansible, Linux, OpenShift, and Networking)
-3. Creates a structured ticket in Kira with root cause analysis, confidence score, and recommended action
-4. Posts a notification to the Rocket.Chat `#support` channel
-
-The ticket you saw in Kira and the notification in Rocket.Chat were both created by Athena — automatically, within minutes of a job failing.
-
-In this workshop, you'll explore how Athena works, extend it with new capabilities, and build your own agents using the same patterns.
+Everything you saw in AAP2, Kira, and Rocket.Chat was produced by this automated pipeline — no human intervention required.
 
 == The compliance angle
 
@@ -146,11 +124,12 @@ An AI agent that acts without logging is a compliance liability. An agent that l
 == Takeaways
 
 * You are an SRE at Meridian Financial, responsible for investigating and resolving infrastructure failures
-* Your lab has 6 consoles accessible via the tab bar — AAP2, Kira, Rocket.Chat, Gitea, OpenShift Console, and Terminal
-* A single set of credentials (`{user}` / `{password}`) works everywhere
-* An AI agent (Athena) is already running in your namespace, analyzing failures and creating tickets
+* AAP2 job templates represent your automation — Jobs shows the execution history, including failures
+* Kira tickets are created automatically by the Athena AI agent with structured root cause analysis
+* Rocket.Chat (or any ChatOps platform) is the notification sink for the on-call team
+* The Deep Agents pipeline connects all three: failure -> classification -> specialist analysis -> ticket + notification
 * Everything your agent does must be traceable for compliance — this is a constraint, not a nice-to-have
 
-*Next*: Module 2 digs deeper into your environment — verifying connectivity, exploring the MaaS LLM gateway, and setting up the environment variables your agent code will use.
+*Next*: Module 2 digs deeper into your environment — verifying connectivity, exploring Red Hat OpenShift AI MaaS (Model as a Service), and setting up the environment variables your agent code will use.
 
 xref:04-module-02-environment.adoc[-> Module 2: Your Environment]
