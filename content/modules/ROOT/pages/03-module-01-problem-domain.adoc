@@ -61,31 +61,47 @@ Click the **Kira** tab and log in with `{user}` / `{password}`
 
 Kira is the ticketing system where your AI assistant creates structured incident tickets. Think of it as a purpose-built Jira for infrastructure operations.
 
-=== Dashboard
+NOTE: The AI agent uses a conservative "temperature" setting optimized for the deterministic behavior desired in AIOps. Your ticket content may differ slightly from the screenshots — this is expected.
 
-The dashboard gives you the operational overview:
+=== Step 1: Review the Dashboard
 
-* **Open tickets** — at least 1 should be open from the failed job
+The dashboard gives you the operational overview at a glance:
+
+* **Open / In Progress / Resolved** — ticket lifecycle counts
+* **Avg Confidence** — how confident the agent is across all analyses
 * **Tickets by Area** — categorized by domain (linux, kubernetes, networking, application)
 * **Risk Distribution** — how severe the AI agent assessed each failure to be
-* **Avg Confidence** — how confident the agent is in its analysis
+* **Recent Tickets** — the latest tickets with title, area, skills, risk, confidence, and status
 
-=== Ticket detail
+You should see at least one open ticket from the seed job that ran during provisioning.
 
-Click into the open ticket in the **Recent Tickets** table.
+image::kira-step-01-dashboard.png[Kira dashboard showing open tickets and area distribution,width=100%]
 
-This ticket was created automatically by the Athena AI agent running in your namespace. Look at the fields:
+=== Step 2: Open a ticket
+
+Click into an open ticket in the **Recent Tickets** table.
+
+This ticket was created automatically by the Athena AI agent running in your namespace. Examine the fields:
 
 * **Title** — a human-readable summary of the failure
-* **Area** — the domain the agent classified this failure into
-* **Confidence** — how sure the agent is about its analysis (0-100%)
-* **Risk** — the assessed severity (critical, high, medium, low)
-* **Description** — the agent's root cause analysis with evidence from the job output
-* **Recommended Action** — specific steps to fix the issue
+* **Risk / Confidence / Stage** — the agent's assessment of severity, certainty, and environment
+* **Skills** — the expertise areas the agent identified as relevant
+* **Affected systems** — specific hosts or services involved
+* **Recommended Action** — numbered steps to fix the issue
+* **Analysis** — the agent's root cause analysis with evidence from the job output
+* **Issues** — sub-issues broken down by severity (high, medium, low)
 
 This is what an AI-generated incident ticket looks like. Your job in this workshop is to understand how it got here — and how to make it better.
 
-image::lab-and-kira-dashboard-01.png[Kira dashboard showing the seed ticket,width=100%]
+image::kira-step-02-ticket-detail.png[Kira ticket detail showing full AI analysis,width=100%]
+
+=== Step 3: Try the AI Chatbot
+
+Notice the chat icon in the bottom right corner of the ticket screen. Click it to open the **AI Chatbot**.
+
+This chatbot is connected to Red Hat OpenShift AI MaaS (Model as a Service) and can answer questions about the ticket in context. Try asking it something like "Explain how AAP2 machine credentials work" — it will respond using the LLM with the ticket context available.
+
+image::kira-step-03-chatbot.png[Kira ticket with AI chatbot open,width=100%]
 
 == Explore Rocket.Chat — ChatOps
 
@@ -95,9 +111,24 @@ Rocket.Chat is the ChatOps notification sink — where the AI assistant posts su
 
 NOTE: In your environment, this is Rocket.Chat. In production, this could just as easily be Slack, Microsoft Teams, or any webhook-capable messaging platform. The pattern is the same — the AI agent posts structured notifications to a channel that humans monitor.
 
-Navigate to the **#support** channel in the left sidebar. You should see a notification from the `aiops` bot matching the ticket you saw in Kira — including the failure summary, risk level, confidence, and a direct link to the ticket.
+=== Step 1: Find the #support channel
 
-image::lab-and-rocketchat-01.png[Rocket.Chat #support channel with AI-generated notification,width=100%]
+After logging in, you'll see the Rocket.Chat home screen. In the left sidebar, click the **#support** channel.
+
+image::rocketchat-step-01-channels.png[Rocket.Chat showing the #support channel in the sidebar,width=100%]
+
+=== Step 2: Review the AI notification
+
+In the `#support` channel, you should see a notification from the `aiops` bot. This matches the ticket you just saw in Kira — the same failure, summarized for ChatOps:
+
+* The job name and failure classification
+* Risk level and confidence score
+* A brief recommended action
+* A direct link to the full ticket in Kira
+
+This is the end of the automated pipeline — the AI agent analyzed the failure, created a ticket, and notified the team, all without human intervention.
+
+image::rocketchat-step-02-support.png[Rocket.Chat #support channel with AI-generated notification,width=100%]
 
 == How it all connects
 
