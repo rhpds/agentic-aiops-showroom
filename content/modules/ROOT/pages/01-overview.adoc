@@ -24,30 +24,17 @@ By the end of this workshop, you'll have hands-on experience with agentic AI pat
 * Triage and classify Ansible Controller failures → automated ticket categorization in Kira
 * Invoke dedicated `sre_` subagents for targeted investigation → faster, more accurate root cause identification
 * Apply human-in/on/out-of-loop patterns → right escalation at the right moment, no more, no less
-* Select and configure models from Red Hat MaaS → optimal cost, capability, and compliance tradeoffs
+* Select and configure models from Red Hat OpenShift AI MaaS (Model as a Service) → optimal cost, capability, and compliance tradeoffs
 * Generate audit-ready incident reports → compliance-friendly output for regulators, automatically
 
 *Technical outcome*: A working agentic AI assistant deployed in your OpenShift namespace, connected to AAP, Kira, and RocketChat.
 
-*Business benefit*: Reduced MTTR, improved SLA adherence, and automatically generated compliance documentation.
+*Business benefits*:
 
-== Target audience
-
-This workshop is designed for:
-
-* Platform engineers and SREs who manage Ansible Automation Platform at scale
-* DevOps practitioners evaluating AI augmentation for operations workflows
-* Architects exploring agentic AI patterns for hybrid infrastructure
-* Anyone curious about how LLMs evolve from chatbots to autonomous agents
-
-== Prerequisites
-
-You should have:
-
-* Experience running and troubleshooting Ansible playbooks
-* Familiarity with OpenShift or Kubernetes (namespace, pod, service concepts)
-* Comfort in a Linux terminal (bash; basic Python is helpful but not required)
-* No prior experience with LangChain or large language models required
+* Reduced MTTR
+* Improved SLA adherence
+* Automatically generated compliance documentation
+* Keep LLM token costs under control
 
 == Meridian Financial's challenges
 
@@ -82,6 +69,7 @@ If the agentic assistant proves effective, Meridian projects:
 * *Scalability*: Handle 10× ticket volume without proportional headcount growth
 * *Knowledge capture*: Agent patterns distill runbook knowledge → self-improving operational knowledge base
 * *Proactive operations*: Shift from reactive ticket response toward predictive failure prevention
+* *Open Source LLMs*: Explore using Open Source LLMs for lower costs, and increased data sovereignty
 
 *Success metric*: Measurably faster, more consistent incident response that satisfies both the engineering team and the compliance auditors.
 
@@ -96,7 +84,7 @@ Module 5 (Compliance & the Human Loop) addresses this directly — including whe
 Module 5 covers guardrails, audit trails, and failure modes.
 
 *"Which model should I use?"*
-→ Red Hat MaaS gives you access to: {litellm_available_models_list}.
+→ MaaS gives you access to: {litellm_available_models_list}.
 Each module introduces MaaS model selection at the relevant touchpoint. No MaaS UI access is required — all interaction is via API.
 
 *"Do I need to be an AI expert?"*
