@@ -60,6 +60,8 @@ Click into the new ticket. Compare the AI agent's analysis to the error you saw 
 * Is the recommended action specific and actionable?
 * Does the confidence score seem reasonable?
 
+TIP: Use the **AI Chatbot** (bottom right of the ticket screen) if you want to confer with the AI about the analysis — ask it to explain the root cause in more detail, suggest alternative fixes, or clarify any technical terms
+
 === Check Rocket.Chat
 
 In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), navigate to **#support**. You should see a new notification from the `aiops` bot for this failure — with the job name, classification, and a link to the Kira ticket.
