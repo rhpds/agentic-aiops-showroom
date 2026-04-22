@@ -10,9 +10,17 @@ Your mission: build and evolve an AI-driven incident response assistant that can
 [IMPORTANT]
 .Your login credentials
 ====
-Your username is `{user}` and your password is `{password}`.
+Username: `{user}` +
+Password: `{password}`
 
-These credentials work for **every console** in this lab: AAP2, Kira, Rocket.Chat, Gitea, OpenShift Console, and the Terminal.
+These credentials work for **every console** in this lab:
+
+* AAP2
+* Kira
+* Rocket.Chat
+* Gitea
+* OpenShift Console
+* Terminal
 ====
 
 == What you'll learn
