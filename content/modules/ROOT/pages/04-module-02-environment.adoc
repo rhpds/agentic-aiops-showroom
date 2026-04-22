@@ -42,8 +42,8 @@ Here's what each step does:
 . **Webhook fires** — AAP2 sends a POST to Athena's webhook endpoint with the job ID
 . **Retrieve job data** — Athena's `ops_manager` agent calls the AAP2 API to fetch the full job output, error details, and metadata
 . **Classify the failure** — the `error-classifier` skill analyzes the error and determines the domain: is this an Ansible issue, a Linux issue, an OpenShift issue, or a Networking issue?
-. **Delegate to a specialist** — based on the classification, `ops_manager` delegates to the right subagent. For a package installation failure, that's `sre_linux`
-. **Root cause analysis** — `sre_linux` reads the incident context, analyzes the error against its domain knowledge, and produces a structured ticket with root cause, confidence, risk, and recommended action
+. **Delegate to a specialist** — based on the classification, `ops_manager` instantiates the right subagent on demand. For a package installation failure, it spins up `sre_linux` — a fresh agent with its own model, system prompt, and skills. The subagent doesn't exist until it's needed
+. **Root cause analysis** — `sre_linux` reads the incident context, analyzes the error against its domain knowledge, and produces a structured ticket with root cause, confidence, risk, and recommended action. When it's done, it returns its findings and is discarded — keeping the `ops_manager` context clean
 . **Quality review** — a lightweight reviewer agent validates the ticket for coherence and actionability
 . **Create ticket** — the structured analysis is submitted to Kira as a ticket with sub-issues
 . **Notify the team** — a summary is posted to the Rocket.Chat `#support` channel
