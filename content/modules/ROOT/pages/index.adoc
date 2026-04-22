@@ -82,7 +82,7 @@ image::tab-bar-01.png[The showroom tab bar,width=100%]
 
 To log in to the OpenShift cluster, click the **Terminal** tab and paste:
 
-[source,bash,subs=attributes+]
+[source,bash,role="execute",subs=attributes+]
 ----
 oc login --insecure-skip-tls-verify \
   -u {user} \

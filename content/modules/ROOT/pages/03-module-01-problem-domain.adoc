@@ -26,7 +26,7 @@ Click the **Terminal** tab on the right side of your screen. You'll see two term
 
 In either terminal, paste the following command to log in to your OpenShift cluster and switch to your working namespace:
 
-[source,bash,subs="attributes"]
+[source,bash,role="execute",subs=attributes+]
 ----
 oc login --insecure-skip-tls-verify \
   -u {user} \
