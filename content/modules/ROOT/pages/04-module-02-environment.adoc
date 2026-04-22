@@ -60,7 +60,7 @@ Click into the new ticket. Compare the AI agent's analysis to the error you saw 
 * Is the recommended action specific and actionable?
 * Does the confidence score seem reasonable?
 
-TIP: Use the **AI Chatbot** (bottom right of the ticket screen) if you want to confer with the AI about the analysis — ask it to explain the root cause in more detail, suggest alternative fixes, or clarify any technical terms
+TIP: Use the **AI Chatbot** (bottom right of the ticket screen) if you want to confer with the AI about the analysis — ask it to explain the root cause in more detail, suggest alternative fixes, or clarify any technical terms. Notice you can choose Open Source models of different sizes — these are provided by MaaS and run across various Nvidia and Intel GPUs utilizing Red Hat OpenShift AI and vLLM
 
 === Check Rocket.Chat
 
