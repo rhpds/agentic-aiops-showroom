@@ -7,7 +7,7 @@ In Module 1, you explored a ticket that was already waiting for you. Now you're 
 
 === Step 1: Find the job template
 
-Click the **AAP2** tab. Navigate to **Automation Execution -> Templates** in the left sidebar.
+In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates** in the left sidebar.
 
 Find **03 Install Web Server** in the list. This playbook attempts to install a web server package on the RHEL VM — but it has a deliberate error that will cause it to fail.
 
@@ -52,7 +52,7 @@ By now, the pipeline should have completed. Let's verify.
 
 === Check Kira
 
-Click the **Kira** tab. You should see a **new ticket** on the dashboard — look for the increased open ticket count and a new entry in the Recent Tickets table.
+In the **Kira** tab (log in with `{user}` / `{password}` if prompted), you should see a **new ticket** on the dashboard — look for the increased open ticket count and a new entry in the Recent Tickets table.
 
 Click into the new ticket. Compare the AI agent's analysis to the error you saw in the AAP2 job output:
 
@@ -62,7 +62,7 @@ Click into the new ticket. Compare the AI agent's analysis to the error you saw 
 
 === Check Rocket.Chat
 
-Click the **Rocket.Chat** tab and navigate to **#support**. You should see a new notification from the `aiops` bot for this failure — with the job name, classification, and a link to the Kira ticket.
+In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), navigate to **#support**. You should see a new notification from the `aiops` bot for this failure — with the job name, classification, and a link to the Kira ticket.
 
 == Breaking it down — the subagent definition
 
