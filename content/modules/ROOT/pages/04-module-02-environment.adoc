@@ -33,30 +33,7 @@ Take note of the error message. In a moment, you'll see the AI agent's analysis 
 
 The job has failed. AAP2 has already fired a webhook. But the AI analysis takes 1-3 minutes to complete — so while you wait, let's walk through exactly what's happening behind the scenes.
 
-[mermaid]
-----
-sequenceDiagram
-    participant AAP2
-    participant Athena as Athena (ops_manager)
-    participant Classifier as Error Classifier
-    participant SRE as sre_linux
-    participant Reviewer
-    participant Kira
-    participant RC as Rocket.Chat
-
-    AAP2->>Athena: Webhook: job failed
-    Athena->>AAP2: Retrieve job output & error
-    Athena->>Classifier: What domain is this?
-    Classifier-->>Athena: linux (confidence: 95%)
-    Athena->>SRE: Analyze this Linux failure
-    SRE->>SRE: Read incident context
-    SRE->>SRE: Root cause analysis
-    SRE-->>Athena: TicketPayload
-    Athena->>Reviewer: Validate ticket quality
-    Reviewer-->>Athena: Approved
-    Athena->>Kira: Create ticket + issues
-    Athena->>RC: Post to #support
-----
+image::deep-agents-pipeline-sequence.svg[Deep Agents pipeline sequence diagram — click to enlarge,align="center",link=self,window=blank,width=700]
 
 Here's what each step does:
 

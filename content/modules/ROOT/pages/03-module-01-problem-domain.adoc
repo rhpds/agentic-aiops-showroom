@@ -134,25 +134,7 @@ image::rocketchat-step-02-support.png[Rocket.Chat #support channel with AI-gener
 
 You've now seen three pieces of the puzzle: a failed job in AAP2, a ticket in Kira, and a notification in Rocket.Chat. But how did that happen? Here's the flow:
 
-[mermaid]
-----
-flowchart TD
-    A[AAP2 Job Fails] --> B[Webhook Fires]
-    B --> C[Athena Deep Agent Catches Webhook]
-    C --> D[Retrieves Job Error from AAP2]
-    D --> E[Classifies Failure Domain]
-    E --> F{Which domain?}
-    F -->|Ansible| G[sre_ansible]
-    F -->|Linux| H[sre_linux]
-    F -->|OpenShift| I[sre_openshift]
-    F -->|Networking| J[sre_networking]
-    G --> K[Root Cause Analysis]
-    H --> K
-    I --> K
-    J --> K
-    K --> L[Creates Ticket in Kira]
-    L --> M[Posts Notification to Rocket.Chat]
-----
+image::deep-agents-pipeline-flow.svg[Deep Agents pipeline flow — click to enlarge,align="center",link=self,window=blank,width=700]
 
 This is the **Deep Agents** pattern in action:
 
