@@ -386,6 +386,3 @@ This demonstrates the routing in action: two different failures, two different s
 * The `ops_manager` automatically routes failures to the right specialist based on the agent's `description` field
 * You just extended an AI operations team without writing any Python
 
-*Next*: Module 4 — you'll swap every agent from frontier to open source models and evaluate whether the results are good enough.
-
-xref:06-module-04-deep-agents.adoc[-> Module 4: Open Source Models — Do You Really Need Frontier?]

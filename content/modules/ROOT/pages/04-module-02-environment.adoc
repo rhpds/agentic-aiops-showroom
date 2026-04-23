@@ -133,6 +133,3 @@ You don't need to modify any code to do any of this. The YAML configuration and 
 * Skills are markdown documents that provide reference knowledge — no code required
 * The pattern is extensible: new domains, better prompts, different models, additional tools
 
-*Next*: Module 3 — you'll explore the Athena codebase, understand how OpenShift makes the system extensible, and build your own specialist agent.
-
-xref:05-module-03-first-agent.adoc[-> Module 3: Understanding your Agentic DevOps Team]

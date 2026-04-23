@@ -178,6 +178,3 @@ An AI agent that logs everything it does — including its reasoning, confidence
 * Compliance requires traceability, not manual intervention — well-logged AI decisions can satisfy regulators
 * The combination of OSS models + configurable autonomy + full audit trail is the path to production-ready AIOps
 
-*Next*: Conclusion — recap what you built and where to go from here.
-
-xref:09-conclusion.adoc[-> Conclusion]
