@@ -430,7 +430,7 @@ This job uses the `admin-backdoor-key` credential — a deprecated shared key th
 * Does the recommended action suggest creating a **per-host credential** instead?
 --
 +
-This is the power of skills — you encoded Meridian Financial's institutional knowledge into a markdown file, and the agent used it to provide context-aware analysis that goes beyond generic SSH troubleshooting.
+This is the power of Skills — you encoded Meridian Financial's institutional knowledge into a markdown file, and the agent used it to provide the LLM with context-aware analysis that goes beyond generic SSH troubleshooting, giving the LLM insight into Meridian's practices, in this case around SSH.
 +
 TIP: Use the **AI Chatbot** to ask follow-up questions about the analysis
 
