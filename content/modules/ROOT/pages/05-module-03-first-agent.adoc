@@ -63,6 +63,17 @@ Here's where it gets interesting. In your namespace, Athena's agent configuratio
 
 If you're curious about how this is wired up, the Helm chart that deploys Athena defines both the ConfigMap and the PVC: https://github.com/rhpds/athena-aiops-deep-agent/tree/main/deploy/helm/athena/templates[deploy/helm/athena/templates/^]. The key files are `configmap.yaml` (agent config), `pvc.yaml` (skills volume), and `deployment.yaml` (which mounts both and includes an initContainer that pre-populates the skills PVC from the image on first boot).
 
+Click the **Terminal** tab and log in to your OpenShift namespace:
+
+[source,bash,role="execute",subs=attributes+]
+----
+oc login --insecure-skip-tls-verify \
+  -u {user} \
+  -p {password} \
+  {openshift_api_url} \
+  --namespace {user}-agentic
+----
+
 === ConfigMap for agent definitions
 
 The `subagents.yaml` and `AGENTS.md` files are stored in a ConfigMap called `athena-agent-config`. You can inspect it from the **Terminal** tab:
