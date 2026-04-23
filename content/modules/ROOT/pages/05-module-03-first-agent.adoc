@@ -23,7 +23,7 @@ This is the source code for the Deep Agent running in your namespace. Let's look
 
 === How agents are defined: `subagents.yaml`
 
-Browse to `subagents.yaml` in the repository root. This is the file you saw annotated in Module 2 — it defines every specialist agent in the system:
+Browse to https://github.com/rhpds/athena-aiops-deep-agent/blob/main/subagents.yaml[subagents.yaml^] in the repository root. This is the file you saw annotated in Module 2 — it defines every specialist agent in the system:
 
 [cols="1,2",options="header"]
 |===
@@ -49,7 +49,7 @@ Each agent has the same structure you saw in Module 2: `description`, `model`, `
 
 === How skills are defined: `skills/` directory
 
-Browse to the `skills/` directory. Each subdirectory contains a `SKILL.md` file — a markdown document that gets loaded into the agent's context as reference knowledge.
+Browse to the https://github.com/rhpds/athena-aiops-deep-agent/tree/main/skills[skills/^] directory. Each subdirectory contains a `SKILL.md` file — a markdown document that gets loaded into the agent's context as reference knowledge.
 
 For example, `skills/analyze-linux-failure/SKILL.md` contains a structured workflow:
 
@@ -63,7 +63,9 @@ Skills are not code — they're instructions written in plain language. Anyone w
 
 == How OpenShift makes this extensible
 
-Here's where it gets interesting. In your namespace, Athena's agent configuration and skills are **not baked into the container image**. They're mounted from Kubernetes resources that you can modify at runtime:
+Here's where it gets interesting. In your namespace, Athena's agent configuration and skills are **not baked into the container image**. They're mounted from Kubernetes resources that you can modify at runtime.
+
+If you're curious about how this is wired up, the Helm chart that deploys Athena defines both the ConfigMap and the PVC: https://github.com/rhpds/athena-aiops-deep-agent/tree/main/deploy/helm/athena/templates[deploy/helm/athena/templates/^]. The key files are `configmap.yaml` (agent config), `pvc.yaml` (skills volume), and `deployment.yaml` (which mounts both and includes an initContainer that pre-populates the skills PVC from the image on first boot).
 
 === ConfigMap for agent definitions
 
