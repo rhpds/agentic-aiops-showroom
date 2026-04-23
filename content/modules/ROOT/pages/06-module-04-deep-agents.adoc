@@ -137,6 +137,42 @@ Both jobs will fail and the pipeline will process them using `qwen3-235b` instea
 A *harness* is the framework that wraps and drives an LLM — managing context, tools, subagent delegation, retries, and output parsing. Deep Agents is the harness in this workshop. The harness is responsible for giving the model exactly the right context at the right time. A well-designed harness makes smaller models perform like larger ones.
 ====
 
+=== Know your models
+
+MaaS gives you a portfolio of Open Source models. Choosing the right one for each agent is a cost/quality/speed tradeoff:
+
+[cols="1,1,2,2",options="header"]
+|===
+|Model |Parameters |Best for |Trade-off
+
+|`qwen3-235b`
+|235B
+|Complex reasoning, orchestration, root cause analysis
+|Highest quality, slower, most compute
+
+|`gpt-oss-120b`
+|120B
+|Strong analysis, good structured output
+|Good balance of quality and speed
+
+|`gpt-oss-20b`
+|20B
+|Simple classification, fast triage
+|Fast and cheap, weaker reasoning
+
+|`llama-scout-17b`
+|17B
+|Lightweight tool use, structured output
+|Smallest, fastest, limited reasoning
+
+|`minimax-m2`
+|—
+|General purpose, multilingual
+|Different architecture, worth evaluating
+|===
+
+In this lab, we use `qwen3-235b` for all agents — it's the most capable OSS model on MaaS and makes the strongest case that open source can match frontier quality. In production, you'd mix models: a larger model for the `ops_manager` (which needs to classify and delegate accurately) and smaller, cheaper models for routine specialist analysis.
+
 === The Agentic Revolution changed the equation
 
 The rise of "vibe coding" and agentic AI development has led to an increasing focus on Open Source models:
