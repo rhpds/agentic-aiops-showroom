@@ -5,4 +5,7 @@ nav:
   - modules/ROOT/nav.adoc
 asciidoc:
   attributes:
-    guid: antora-yml-won
+    guid: 12345
+    user: user-12345
+    password: deeper-agents
+    openshift_api_url: "https://openshift.example.com:6443"

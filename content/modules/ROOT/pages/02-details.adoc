@@ -10,21 +10,20 @@
 * *Module 1*: The Problem Domain (8 min)
 * *Module 2*: Your Environment (10 min)
 * *Module 3*: Your First SRE Agent (12 min)
-* *Module 4*: Deep Agents & Subagents (15 min)
-* *Module 5*: Compliance & the Human Loop (12 min)
-* *Module 6*: Full-Stack Incident Response (10 min)
+* *Module 4*: Open Source Models (15 min)
+* *Module 5*: TBD (15 min)
 * *Conclusion & Discussion* (5 min)
 
 === Abbreviated workshop (45 minutes)
 
-If time is short, complete Modules 1–3 for a self-contained introduction to the problem domain and first agent:
+If time is short, complete Modules 1-3 for a self-contained introduction to the problem domain and first agent:
 
 * *Module 1*: The Problem Domain (8 min)
 * *Module 2*: Your Environment (10 min)
 * *Module 3*: Your First SRE Agent (12 min)
 * *Discussion & Takeaways* (5 min)
 
-Modules 4–6 can be completed asynchronously — your environment persists for the duration of your provisioned session.
+Modules 4-5 can be completed asynchronously -- your environment persists for the duration of your provisioned session.
 
 == Technical requirements
 
@@ -152,7 +151,7 @@ The VM is accessible only from within the cluster network via the Showroom termi
 
 *Workshop*: LB 2645 — Red Hat Summit 2026
 
-*Workshop Version*: 0.1 (draft)
+*Workshop Version*: 0.2 (draft)
 
 *Last Updated*: April 2026
 
