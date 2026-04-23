@@ -1,364 +1,213 @@
-= Module 4: Deep Agents & Subagents
+= Module 4: Open Source Models — Do You Really Need Frontier?
 :source-highlighter: rouge
-:toc: macro
-:toclevels: 1
 
-Your Module 3 agent triaged a ticket.
-It made a recommendation.
-It posted to RocketChat.
+In the previous modules, your AI agents used `claude-sonnet-4-6` — a frontier model from Anthropic. It's capable, but it's also expensive, and every API call sends your job output data to an external provider.
 
-But the recommendation was based on a ticket summary — not on actual investigation.
-The agent didn't look at the job log.
-It didn't check the playbook.
-It didn't touch the RHEL VM.
+In this module, you'll switch every agent to `qwen3-235b` — a 235-billion parameter open source model running on Red Hat OpenShift AI via MaaS. Same pipeline, same skills, same prompts — different model. Then you'll evaluate whether the results are good enough.
 
-At Meridian Financial, a triage recommendation with no evidence isn't enough.
-Auditors want root cause. Compliance requires traceability. Engineers need actionable findings.
+== Exercise 1: Test an OSS model in the chatbot
 
-This module introduces LangChain's Deep Agents framework — specifically the multi-agent supervisor pattern with dedicated `sre_` subagents.
-Each subagent is responsible for one investigative domain.
-The supervisor orchestrates them, accumulates their findings, and produces a verified root cause analysis.
+Before changing the pipeline, let's get a feel for how `qwen3-235b` handles SRE reasoning.
 
-This is the architecture that can actually reduce MTTR.
+. In the **Kira** tab (log in with `{user}` / `{password}` if prompted), open any existing ticket
 
-toc::[]
+. Click the **AI Chatbot** icon in the bottom right corner
 
-== Learning objectives
+. In the model selector dropdown at the top of the chat, select **qwen3-235b**
 
-By the end of this module, you'll be able to:
-
-* Describe the Deep Agents supervisor/subagent architecture and why context isolation matters
-* Implement at least two `sre_` subagents with distinct investigative responsibilities
-* Configure the supervisor agent to orchestrate subagents based on ticket characteristics
-* Understand how to select different MaaS models for supervisor vs. subagent workloads
-
-== Concept: Why subagents?
-
-Before writing code, understand the design choice.
-
-A single agent with many tools has a problem: *context contamination*.
-When the agent calls five tools in sequence, the context window fills with outputs from all five — job logs, playbook source, SSH output, API responses.
-By tool call #4, the LLM is reasoning across thousands of tokens of mixed context.
-Errors accumulate. Reasoning degrades.
-
-The Deep Agents pattern solves this with *context isolation*:
-
-----
-Supervisor Agent (gpt-oss-120b)
-│   Reads: Kira ticket
-│   Decides: which subagents to invoke
-│   Accumulates: brief finding summaries (not raw outputs)
-│   Produces: root cause analysis
-│
-├── sre_job_log_agent (gpt-oss-20b)
-│       Reads: AAP Controller job output for failed hosts
-│       Produces: "SSH handshake failed at step 3, key not found for host rhel-node-04"
-│
-├── sre_playbook_agent (llama-scout-17b)
-│       Reads: playbook source from Gitea
-│       Produces: "Task 'ensure_ssh_keys' uses vars/credentials.yml which is absent"
-│
-└── sre_vm_agent (gpt-oss-20b)
-        SSH to RHEL VM, checks: key presence, auth log, sshd_config
-        Produces: "authorized_keys file is empty on rhel-node-[04-10]"
-----
-
-Each subagent:
-
-* Has its own isolated context
-* Uses the smallest model capable of its task (cost efficiency)
-* Returns a *brief finding summary*, not raw output
-* Is stateless — it doesn't know what other subagents found
-
-The supervisor collects these summaries and reasons across them using a larger model.
-
-NOTE: LangChain's Deep Agents framework handles the orchestration, routing, and context management.
-Your job is to define the agents, their tools, and the routing logic.
-
-// TODO: Link to LangChain Deep Agents documentation once stable URL confirmed
-
-== Exercise 1: Explore the subagent starter code
-
-[source,bash]
-----
-cd ~/workshop/module-04-deep-agents
-ls -la
-----
-
-Expected structure:
-----
-module-04-deep-agents/
-├── supervisor.py            ← orchestrates subagents
-├── agents/
-│   ├── sre_job_log_agent.py ← investigates AAP job output
-│   ├── sre_playbook_agent.py← investigates Gitea playbook source
-│   └── sre_vm_agent.py      ← SSH investigation on RHEL VM
-├── tools/
-│   ├── aap_tool.py          ← fetches AAP job logs
-│   ├── gitea_tool.py        ← reads playbook files
-│   └── ssh_tool.py          ← SSH tool (read-only commands)
-├── prompts/
-│   ├── supervisor.txt
-│   ├── job_log.txt
-│   ├── playbook.txt
-│   └── vm.txt
-└── requirements.txt
-----
-
-Open `agents/sre_job_log_agent.py`:
-
-[source,python]
-----
-# agents/sre_job_log_agent.py
-import os
-from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate
-from tools.aap_tool import get_job_log
-
-# Subagents use a smaller, faster model — their task is narrow and well-defined
-llm = ChatOpenAI(
-    base_url=os.environ["MAAS_API_BASE"],
-    api_key=os.environ["MAAS_API_KEY"],
-    model="gpt-oss-20b",      # Small model — sufficient for log parsing
-    temperature=0,
-)
-
-tools = [get_job_log]
-
-prompt = ChatPromptTemplate.from_messages([
-    ("system", open("prompts/job_log.txt").read()),
-    ("human", "{input}"),
-    ("placeholder", "{agent_scratchpad}"),
-])
-
-agent = create_tool_calling_agent(llm, tools, prompt)
-
-# This agent is not run standalone — it is invoked by the supervisor
-job_log_agent = AgentExecutor(agent=agent, tools=tools, verbose=False)
-----
-
-Note: subagents have `verbose=False` — their internal reasoning is hidden from the supervisor.
-Only their final output (the finding summary) is passed up.
-
-=== Verify
-
-✓ You can navigate to `module-04-deep-agents/` and see the expected directory structure
-
-✓ You can open and read `agents/sre_job_log_agent.py`
-
-✓ You understand why `verbose=False` is used for subagents
-
-== Exercise 2: Read the supervisor
-
-Open `supervisor.py`:
-
-[source,python]
-----
-# supervisor.py
-import os
-from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate
-from tools.kira_tool import get_open_ticket
-from tools.rocket_tool import post_to_rocketchat
-
-from agents.sre_job_log_agent import job_log_agent
-from agents.sre_playbook_agent import playbook_agent
-from agents.sre_vm_agent import vm_agent
-
-# Supervisor uses a larger, more capable model — it must reason across findings
-llm = ChatOpenAI(
-    base_url=os.environ["MAAS_API_BASE"],
-    api_key=os.environ["MAAS_API_KEY"],
-    model="gpt-oss-120b",     # Larger model — needed for multi-source reasoning
-    temperature=0,
-)
-
-# Subagents are wrapped as tools for the supervisor
-# Each tool returns a brief finding summary, not raw output
-from langchain.tools import Tool
-
-def run_job_log_investigation(ticket_id: str) -> str:
-    """Investigate the Ansible Controller job log for a ticket."""
-    result = job_log_agent.invoke({"input": f"Investigate job log for ticket {ticket_id}"})
-    return result["output"]
-
-def run_playbook_investigation(ticket_id: str) -> str:
-    """Investigate the Ansible playbook source related to a ticket."""
-    result = playbook_agent.invoke({"input": f"Find playbook issues related to ticket {ticket_id}"})
-    return result["output"]
-
-def run_vm_investigation(ticket_id: str) -> str:
-    """SSH into affected RHEL VM and investigate the error condition."""
-    result = vm_agent.invoke({"input": f"Check RHEL VM state for ticket {ticket_id}"})
-    return result["output"]
-
-tools = [
-    get_open_ticket,
-    Tool(name="investigate_job_log",
-         func=run_job_log_investigation,
-         description="Investigate the AAP job log for a given Kira ticket ID"),
-    Tool(name="investigate_playbook",
-         func=run_playbook_investigation,
-         description="Review the Ansible playbook source for issues related to a ticket"),
-    Tool(name="investigate_vm",
-         func=run_vm_investigation,
-         description="SSH into the affected RHEL VM and check its state"),
-    post_to_rocketchat,
-]
-
-prompt = ChatPromptTemplate.from_messages([
-    ("system", open("prompts/supervisor.txt").read()),
-    ("human", "{input}"),
-    ("placeholder", "{agent_scratchpad}"),
-])
-
-agent = create_tool_calling_agent(llm, tools, prompt)
-supervisor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-
-if __name__ == "__main__":
-    result = supervisor.invoke({
-        "input": "Investigate the highest-severity open Kira ticket. Use your subagents to build a complete root cause analysis. Post findings to #lb2645-agent in RocketChat."
-    })
-    print(result["output"])
-----
-
-=== Verify
-
-✓ You can identify which model the supervisor uses and why it differs from the subagents
-
-✓ You understand how subagents are wrapped as tools for the supervisor
-
-✓ You can trace the data flow: Kira ticket → subagent investigations → supervisor synthesis → RocketChat
-
-== Exercise 3: Run the deep agent
-
-[source,bash]
-----
-cd ~/workshop/module-04-deep-agents
-pip install -r requirements.txt
-
-python supervisor.py
-----
-
-Watch the supervisor's reasoning with `verbose=True`.
-You should see it:
-
-. Call `get_open_ticket` to retrieve the current highest-severity ticket
-. Decide which subagents to invoke based on the error class
-. Call `investigate_job_log` — which internally invokes `sre_job_log_agent`
-. Call `investigate_playbook`
-. Call `investigate_vm`
-. Synthesize the three finding summaries into a root cause analysis
-. Post to RocketChat `#lb2645-agent`
-
-// TODO: Add expected verbose output trace from actual test run
-
-Check RocketChat `#lb2645-agent` for the root cause analysis.
-It should include:
-
-* The confirmed root cause (not a guess — based on actual investigation)
-* Evidence from each subagent
-* A recommended remediation step
-* Whether a human should review before action is taken
-
-=== Verify
-
-✓ `python supervisor.py` runs to completion without errors
-
-✓ All three subagents are invoked during the run (visible in verbose output)
-
-✓ A root cause analysis appears in RocketChat `#lb2645-agent` with evidence from multiple sources
-
-✓ The root cause is more specific than Module 3's triage recommendation
-
-== Exercise 4: Experiment with model selection
-
-The starter code uses `gpt-oss-120b` for the supervisor and `gpt-oss-20b` for subagents.
-Test what happens when you change these:
-
-. Change `sre_vm_agent.py` to use `llama-scout-17b` (structured output, tool use):
+. Ask the chatbot a question about the ticket — for example:
 +
-[source,python]
 ----
-model="llama-scout-17b",
-----
-
-. Change the supervisor to use `qwen3-235b` (complex reasoning):
-+
-[source,python]
-----
-model="qwen3-235b",
+What is the root cause of this failure and what would you recommend?
 ----
 
-. Re-run and compare:
+. Evaluate the response:
 +
 --
-* Is the root cause analysis more or less specific?
-* Does the supervisor invoke subagents in a different order?
-* How does inference time change?
+* Is the reasoning coherent?
+* Does it reference the actual error from the ticket?
+* Are the recommendations specific and actionable?
+--
++
+You're comparing this against the frontier model responses you've seen in previous modules. Keep this mental benchmark as we switch the pipeline.
+
+== Exercise 2: Switch all agents to OSS
+
+Now let's swap the entire agent team to `qwen3-235b`. The process is the same as Module 3 — download a pre-built configuration and patch the ConfigMap.
+
+. Click the **Terminal** tab and log in if needed:
++
+[source,bash,role="execute",subs=attributes+]
+----
+oc login --insecure-skip-tls-verify \
+  -u {user} \
+  -p {password} \
+  {openshift_api_url} \
+  --namespace {user}-agentic
+----
++
+_Sample output:_
++
+----
+Login successful.
+Using project "user-XXXXX-agentic".
+----
+
+. Download the OSS model configuration:
++
+[source,bash,role="execute",subs=attributes+]
+----
+curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/subagents-oss-models.yaml \
+  -o /tmp/subagents-oss.yaml
+----
+
+. Verify the model change — every agent should now use `qwen3-235b`:
++
+[source,bash,role="execute",subs=attributes+]
+----
+grep "model:" /tmp/subagents-oss.yaml
+----
++
+_Expected output:_
++
+----
+  model: qwen3-235b
+  model: qwen3-235b
+  model: qwen3-235b
+  model: qwen3-235b
+  model: qwen3-235b
+  model: qwen3-235b
+----
++
+All six agents (including the reviewer) are now using the open source model.
+
+. Patch the ConfigMap:
++
+[source,bash,role="execute",subs=attributes+]
+----
+oc create configmap athena-agent-config \
+  --from-file=subagents.yaml=/tmp/subagents-oss.yaml \
+  --from-file=AGENTS.md=<(oc get configmap athena-agent-config -o jsonpath='{.data.AGENTS\.md}') \
+  --dry-run=client -o yaml | oc apply -f -
+----
++
+_Expected output:_
++
+----
+configmap/athena-agent-config configured
+----
+
+. Roll out the change:
++
+[source,bash,role="execute",subs=attributes+]
+----
+oc rollout restart deployment/athena && \
+  oc rollout status deployment/athena --timeout=120s
+----
++
+_Expected output:_
++
+----
+deployment.apps/athena restarted
+...
+deployment "athena" successfully rolled out
+----
+
+== Exercise 3: Launch two failures
+
+Now let's give the OSS-powered pipeline two different failures to analyze.
+
+. In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates**
+
+. Launch **05 Update System Packages** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
++
+This is a Linux domain failure — a package repository or Satellite content issue.
+
+. Launch **07 Deploy Payment Service** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
++
+This is an OpenShift domain failure — a namespace or manifest issue.
+
+Both jobs will fail and the pipeline will process them using `qwen3-235b` instead of `claude-sonnet-4-6`. While we wait, let's talk about why this matters.
+
+== Why Open Source models are more than good enough
+
+[NOTE]
+.What is an agentic "harness"?
+====
+A *harness* is the framework that wraps and drives an LLM — managing context, tools, subagent delegation, retries, and output parsing. Deep Agents is the harness in this workshop. The harness is responsible for giving the model exactly the right context at the right time. A well-designed harness makes smaller models perform like larger ones.
+====
+
+=== The Agentic Revolution changed the equation
+
+The rise of "vibe coding" and agentic AI development has led to an increasing focus on Open Source models:
+
+* **Agentic harnesses are better at driving LLMs** — frameworks like Deep Agents don't just send a prompt and hope. They manage context windows, delegate to specialists, provide structured skills, and parse outputs. This structured approach compensates for the capability gap between frontier and OSS models
+* **Excellent context helps smaller models** — when you give a 235B parameter model a focused system prompt, a specific skill document, and a structured incident context, it performs remarkably well. The model doesn't need to "know everything" — it just needs to reason about the specific data in front of it
+* **Skills do the heavy lifting** — your `sre_ssh` skill from Module 3 encoded institutional knowledge about Meridian's backdoor key policy. The model doesn't need to have learned this from training data — you gave it the answer as context. A 7B model could use that skill effectively
+
+=== Cost
+
+Frontier model pricing adds up fast in an operations environment:
+
+* A single incident analysis involves multiple LLM calls: classification, specialist reasoning, review
+* At 40+ failures per week, token costs become a significant line item
+* OSS models running on your own infrastructure have a fixed compute cost — no per-token billing, no usage surprises
+
+=== Data sovereignty
+
+Every API call to a frontier model sends your data to an external provider:
+
+* Job output logs may contain hostnames, IP addresses, and system topology
+* Credential names and configuration details are visible in error messages
+* In a regulated environment like Meridian Financial, this creates data residency risk
+
+OSS models running on MaaS keep everything within Red Hat's infrastructure — your data never leaves the platform.
+
+=== Security
+
+* No API keys to external providers to manage, rotate, or risk leaking
+* Network traffic stays internal — no egress to external LLM APIs
+* Audit trail is complete — all inference happens within your controlled environment
+
+== Exercise 4: Evaluate the results
+
+The pipeline should have processed both failures by now.
+
+. In the **Kira** tab (log in with `{user}` / `{password}` if prompted), find the two new tickets
+
+. For each ticket, evaluate:
++
+--
+* **Root cause accuracy** — did the agent correctly identify what failed and why?
+* **Recommended action quality** — are the steps specific and actionable?
+* **Confidence score** — does it seem well-calibrated?
+* **Overall coherence** — does the analysis read like it was written by a competent SRE?
 --
 
-// TODO: Document observed differences between model choices during lab validation
+. Compare these OSS-generated tickets against the frontier-generated tickets from earlier modules
++
+--
+* Can you tell which model produced which ticket?
+* Is the quality difference meaningful enough to justify the cost and data exposure of frontier models?
+* Where, if anywhere, would you still want a frontier model?
+--
++
+TIP: Use the **AI Chatbot** with `qwen3-235b` selected to ask follow-up questions about the tickets
 
-NOTE: There is no single "best" model choice. Context window size, reasoning capability, response speed, and cost all interact.
-In production, you would benchmark models against your specific failure classes.
-
-=== Verify
-
-✓ You can change model selection per agent without breaking the supervisor flow
-
-✓ You observe at least one meaningful difference in output quality or speed between model choices
-
-== Troubleshooting
-
-*Issue*: `sre_vm_agent` times out or returns empty output
-*Solution*: SSH connectivity to `{rhel_vm_hostname}` requires the cluster network.
-Verify the Showroom terminal can reach the VM: `ssh {rhel_vm_user}@{rhel_vm_hostname} 'whoami'`.
-If this works but the agent fails, check `tools/ssh_tool.py` for the SSH timeout setting.
-
-*Issue*: Supervisor calls only one subagent instead of three
-*Solution*: The supervisor makes its own routing decisions based on the prompt.
-If the error class in the ticket doesn't suggest VM involvement, it may skip `investigate_vm`.
-Edit `prompts/supervisor.txt` to add an explicit instruction: "Always invoke all three investigation tools."
-
-*Issue*: Root cause analysis in RocketChat is identical to Module 3 triage
-*Solution*: The subagents may not have found real evidence (e.g., Gitea playbook not found, SSH failed silently).
-Run each subagent manually to debug: `python -c "from agents.sre_job_log_agent import job_log_agent; print(job_log_agent.invoke({'input': 'Investigate KIRA-0042'}))"`.
-
-*Issue*: `gpt-oss-120b` is very slow (>30 seconds)
-*Solution*: This is expected for large reasoning models on complex inputs. Switch to `gpt-oss-20b` for the supervisor while developing, then switch back for the final run.
+. In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), check `#support` for the notifications
 
 == Takeaways
 
-*What you built in this module*:
+* Switching from frontier to OSS models is a configuration change — same pipeline, same skills, same prompts
+* `qwen3-235b` running on MaaS provides analysis quality comparable to frontier models for structured SRE tasks
+* Agentic harnesses like Deep Agents compensate for the capability gap by providing focused context and structured workflows
+* Skills and system prompts do most of the work — the model provides the reasoning engine
+* OSS models on MaaS offer three strategic advantages:
+** **Cost** — fixed infrastructure cost vs per-token billing
+** **Data sovereignty** — your data stays within your infrastructure
+** **Security** — no external API keys, no egress traffic, complete audit trail
+* The choice between frontier and OSS isn't binary — you can mix models per agent based on task complexity
 
-* A multi-agent system with a supervisor orchestrating three specialized `sre_` subagents
-* Context isolation: each subagent has its own context window, keeping the supervisor's reasoning clean
-* Hierarchical model selection: larger models where reasoning depth matters, smaller models where task scope is narrow
-* Evidence-based root cause analysis: findings grounded in actual job logs, playbook source, and VM state — not pattern matching on ticket fields
+*Next*: Module 5 explores compliance and human-in-the-loop patterns.
 
-*The MaaS touchpoint*:
-
-Each agent in your system makes independent model calls to Red Hat MaaS.
-This means your supervisor can use `gpt-oss-120b` for synthesis while subagents use `gpt-oss-20b` or `llama-scout-17b` for focused tasks — all via the same LiteLLM endpoint, the same virtual key, and the same API pattern.
-Cost optimization is a natural outcome of the subagent architecture.
-
-*Strengths of this approach*:
-
-* Root cause quality improves dramatically over single-turn triage
-* Context isolation makes the system more predictable and debuggable
-* Subagents can be tested and improved independently
-* The supervisor prompt becomes your primary business logic surface
-
-*Weaknesses to understand*:
-
-* More complex to implement and debug than a single agent
-* Subagent failures are silent unless you build explicit error handling
-* Latency increases — three subagent calls plus supervisor synthesis is slower than one triage call
-* Context isolation means subagents can't learn from each other within a single run
-
-*Next*: Module 5 addresses a critical question — when the agent can *act*, not just analyze. Compliance, audit trails, and human-loop patterns determine when your agent should proceed autonomously and when it must stop and ask.
-
-xref:07-module-05-compliance-loop.adoc[→ Module 5: Compliance & the Human Loop]
+xref:07-module-05-compliance-loop.adoc[-> Module 5: Compliance & the Human Loop]
