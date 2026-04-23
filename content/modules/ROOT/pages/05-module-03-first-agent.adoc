@@ -1,7 +1,70 @@
 = Module 3: Understanding your Agentic DevOps Team
 :source-highlighter: rouge
 
-In Module 2, you watched the Deep Agents pipeline analyze a failure. Now you're going to look under the hood — explore how agents and skills are defined, understand how OpenShift makes the system extensible, and then build and deploy a new specialist agent yourself.
+In Module 2, you watched the Deep Agents pipeline analyze a failure. Now you're going to look under the hood — understand the architecture of your AI operations team, explore how agents and skills are defined, and then build and deploy a new specialist agent yourself.
+
+== Meet Athena — your AIOps team
+
+Athena is not a single AI agent. It's a **team** of specialized agents, orchestrated by a manager, each with its own expertise, tools, and domain knowledge.
+
+image::athena-team-architecture.svg[Athena team architecture — ops_manager delegates to specialist subagents,link=self,width=100%]
+
+=== The ops_manager — your team lead
+
+At the center is `ops_manager`, a long-running Deep Agent that uses the **ReAct** (Reason + Act) pattern. When a failure arrives via webhook, `ops_manager`:
+
+. Reads the incident data (job output, error details, metadata)
+. *Reasons* about which domain this failure belongs to
+. *Acts* by delegating to the right specialist via the `task` tool
+. Reviews the specialist's work via the `reviewer` agent
+. Returns the final ticket
+
+The `ops_manager` stays running across the entire analysis — it's the orchestrator that holds the conversation together.
+
+=== The sre_ subagents — your specialists
+
+The four `sre_*` subagents are **ephemeral** — they're created on demand when `ops_manager` calls `task()`, and discarded after they return their analysis. Each one is a focused expert:
+
+[cols="1,2",options="header"]
+|===
+|Subagent |Expertise
+
+|`sre_ansible`
+|Playbook errors, credential issues, execution environments, variable resolution
+
+|`sre_linux`
+|Package management, systemd, SELinux, filesystem, Satellite content
+
+|`sre_openshift`
+|Pod lifecycle, RBAC, operators, namespace/quota, security contexts
+
+|`sre_networking`
+|DNS, SSH connectivity, proxy/TLS, routing, firewall
+|===
+
+=== Why ephemeral subagents matter — context isolation
+
+This is a critical architectural decision. Consider what would happen if a single agent handled everything:
+
+* `ops_manager` analyzes an SSH failure — 3000 tokens of SSH debug output fills the context
+* Next, a package installation failure arrives — the SSH output is still in context, confusing the analysis
+* By the fifth failure, the context is bloated with irrelevant data from previous investigations
+
+Ephemeral subagents solve this. Each `sre_*` agent starts with a **fresh context** — only the incident data and its domain-specific skills. When it finishes, its context is discarded. The `ops_manager` only sees the final `TicketPayload` result, not the specialist's internal reasoning. This keeps every analysis clean and focused.
+
+=== Skills — domain knowledge without code
+
+Each subagent is loaded with **skills** — markdown documents that provide domain-specific diagnostic workflows, institutional knowledge, and output formatting guidance. Skills are the reference library that turns a general-purpose LLM into a domain expert.
+
+=== Tools — how agents take action
+
+Agents can call **tools** — functions that let them interact with external systems. In Athena, the key tool is `task()` which lets `ops_manager` delegate to subagents. Subagents also have `web_search` for looking up documentation.
+
+=== Models — the reasoning engine
+
+Each agent can use a different **model** from MaaS. The `ops_manager` might use a frontier model for complex reasoning, while subagents use a smaller, cheaper model for focused domain analysis. The `reviewer` can use an even lighter model since it only validates, not analyzes.
+
+In the next exercises, you'll explore all of these components in the codebase and then build a new specialist agent yourself.
 
 == Exercise 1: Launch a background failure
 
