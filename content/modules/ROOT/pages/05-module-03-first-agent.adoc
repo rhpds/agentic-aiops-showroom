@@ -116,64 +116,19 @@ You're going to create a dedicated `sre_ssh` agent with a skill that encodes thi
 
 === Step 1: Create the skill
 
-First, create the skill directory and SKILL.md on the PVC. From the **Terminal** tab:
+First, download the SSH analysis skill from your Gitea repository and copy it onto the PVC. This skill file contains Meridian Financial's institutional knowledge about the Q4 2025 SSH key deprecation.
+
+From the **Terminal** tab:
 
 [source,bash,role="execute",subs=attributes+]
 ----
 oc exec deployment/athena -c athena -- mkdir -p /app/skills/analyze-ssh-failure
 ----
 
-Now create the skill file with Meridian Financial's institutional knowledge about SSH credential management:
-
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- sh -c 'cat > /app/skills/analyze-ssh-failure/SKILL.md << '\''SKILL'\''
----
-name: analyze-ssh-failure
-description: SSH authentication failure analysis with institutional knowledge
----
-
-# Analyze SSH Authentication Failure
-
-Deep analysis of AAP2 job failures caused by SSH authentication and credential issues.
-
-## Institutional Knowledge — Meridian Financial SSH Policy
-
-**CRITICAL CONTEXT (Q4 2025 Policy Change):**
-
-In late 2025, Meridian Financial deprecated all shared "backdoor" SSH keys
-in favor of per-host, per-user key pairs managed through AAP2 credentials.
-
-Key facts:
-- Legacy `admin-backdoor-key` credentials are **no longer authorized**
-- Each host now requires a dedicated SSH credential in AAP2
-- The old backdoor keys were rotated and revoked on all production hosts
-- Any job using a backdoor-style credential will fail with "Permission denied (publickey)"
-- This is **by design** — not a misconfiguration
-
-## Diagnostic Workflow
-
-1. **Read** the incident context: check for SSH-related errors in the job output
-2. **Identify** the credential used: look at the AAP2 credential name in the job metadata
-3. **Check for backdoor key usage**: if the credential name contains "backdoor", "shared",
-   or "admin-key", this is a deprecated credential — the fix is to create a proper per-host credential
-4. **For legitimate SSH failures**:
-   - Check if the public key is deployed to the target host authorized_keys
-   - Verify the SSH user exists on the target
-   - Check for SELinux context on .ssh directory and authorized_keys
-   - Verify SSH daemon configuration (PubkeyAuthentication, AuthorizedKeysFile)
-5. **Recommend** specific remediation:
-   - For deprecated keys: create a new per-host credential in AAP2, deploy the public key
-   - For key deployment issues: provide exact commands for key installation and permissions
-   - For SSH config issues: provide sshd_config corrections
-
-## Risk Assessment
-
-- Deprecated backdoor key usage: **high risk** — indicates a compliance gap
-- Missing authorized_keys: **medium risk** — standard operational fix
-- SSH daemon misconfiguration: **medium risk** — requires careful change management
-SKILL
-'
+curl -sL https://gitea.{openshift_cluster_ingress_domain}/{user}/agentic-devops-plays/raw/branch/main/configs/analyze-ssh-failure-SKILL.md \
+  | oc exec -i deployment/athena -c athena -- sh -c 'cat > /app/skills/analyze-ssh-failure/SKILL.md'
 ----
 
 Verify the skill was created:
@@ -183,26 +138,21 @@ Verify the skill was created:
 oc exec deployment/athena -c athena -- cat /app/skills/analyze-ssh-failure/SKILL.md
 ----
 
-=== Step 2: Add the agent to the ConfigMap
+You should see the skill content including the **Institutional Knowledge** section about the backdoor key deprecation. This is the tribal knowledge that makes this agent smarter than a generic SSH troubleshooter.
 
-Now add the `sre_ssh` agent definition to the ConfigMap. This is the key step — you're telling the `ops_manager` that a new specialist exists and when to use it.
+=== Step 2: Update the ConfigMap with the new agent
 
-[source,bash,role="execute",subs=attributes+]
-----
-oc edit configmap athena-agent-config
-----
-
-This opens the ConfigMap in your terminal editor. Find the `subagents.yaml` section and add the following **before** the `reviewer:` entry:
+Now you need to add the `sre_ssh` agent definition to the ConfigMap. Here's what the new entry looks like:
 
 [source,yaml]
 ----
 sre_ssh:
-  description: >
+  description: > # <1>
     SSH and authentication specialist. Delegate SSH credential failures:
     key rejection, permission denied (publickey), backdoor key deprecation,
     authorized_keys issues, and AAP2 credential misconfiguration.
-  model: claude-sonnet-4-6
-  system_prompt: |
+  model: claude-sonnet-4-6 # <2>
+  system_prompt: | # <3>
     You are a senior SRE specializing in SSH authentication and credential
     management. You receive incident data from failed AAP2 jobs and perform
     root-cause analysis on SSH-related failures.
@@ -216,17 +166,58 @@ sre_ssh:
 
     Use the create-ticket skill to structure your analysis as a TicketPayload.
     Set area to "networking" for all SSH-domain issues.
-  tools:
+  tools: # <4>
     - web_search
-  skills:
+  skills: # <5>
     - ./skills/analyze-ssh-failure/
     - ./skills/create-ticket/
     - ./skills/common/
 ----
+<1> **Description** — the `ops_manager` reads this to decide when to route a failure to this agent. Mentioning "SSH", "credential", "publickey", and "backdoor" ensures SSH-related failures get routed here instead of to `sre_networking`
+<2> **Model** — using `claude-sonnet-4-6` for strong reasoning. For a cost-sensitive deployment, you could use a smaller model
+<3> **System prompt** — instructs the agent to check for deprecated backdoor keys and reference the skill for institutional knowledge
+<4> **Tools** — `web_search` lets the agent look up SSH documentation if needed
+<5> **Skills** — points to the skill you just created, plus the shared `create-ticket` and `common` skills
 
-IMPORTANT: YAML indentation matters. The `sre_ssh:` key must be at the same level as the other agent keys (`sre_ansible:`, `sre_linux:`, etc.). Use 2 spaces for indentation, not tabs.
+Rather than manually editing the YAML (where a single indentation error would break the configuration), download the complete pre-built `subagents.yaml` that includes `sre_ssh` and patch the ConfigMap:
 
-Save and exit the editor (`:wq` in vim, or `Ctrl+X` then `Y` in nano).
+[source,bash,role="execute",subs=attributes+]
+----
+curl -sL https://gitea.{openshift_cluster_ingress_domain}/{user}/agentic-devops-plays/raw/branch/main/configs/subagents-with-sre-ssh.yaml \
+  -o /tmp/subagents-new.yaml
+----
+
+Verify the download — you should see `sre_ssh` in the file:
+
+[source,bash,role="execute",subs=attributes+]
+----
+grep "^sre_" /tmp/subagents-new.yaml
+----
+
+Expected output:
+----
+sre_ansible:
+sre_linux:
+sre_openshift:
+sre_networking:
+sre_ssh:
+----
+
+Now patch the ConfigMap with the new `subagents.yaml`:
+
+[source,bash,role="execute",subs=attributes+]
+----
+oc create configmap athena-agent-config \
+  --from-file=subagents.yaml=/tmp/subagents-new.yaml \
+  --from-file=AGENTS.md=<(oc get configmap athena-agent-config -o jsonpath='{.data.AGENTS\.md}') \
+  --dry-run=client -o yaml | oc apply -f -
+----
+
+This command:
+
+* Creates a new ConfigMap definition from the downloaded file (preserving the existing `AGENTS.md`)
+* Uses `--dry-run=client -o yaml` to generate the YAML without applying it
+* Pipes it to `oc apply` which updates the existing ConfigMap in place
 
 === Step 3: Roll out the change
 
