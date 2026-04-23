@@ -3,24 +3,26 @@
 
 In Module 2, you watched the Deep Agents pipeline analyze a failure. Now you're going to look under the hood — explore how agents and skills are defined, understand how OpenShift makes the system extensible, and then build and deploy a new specialist agent yourself.
 
-== Launch another failure
+== Exercise 1: Launch a background failure
 
 Let's start a job running so the pipeline has something to work on while we explore.
 
-In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates** and launch **08 Deploy Monitoring Agent** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
+. In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates**
 
+. Launch **08 Deploy Monitoring Agent** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
++
 This job deploys an application with a security context that OpenShift will reject — a different failure domain from the package issue in Module 2. Let it run in the background while we explore the architecture.
 
-== Explore the Athena codebase
+== Exercise 2: Explore the Athena codebase
 
-Click the **Gitea** tab. You'll see the repositories available on this cluster — no login required, the Athena repo is public.
+. Click the **Gitea** tab — no login required, the Athena repo is public
++
+Navigate to the **athena-aiops-deep-agent** repository. This is the source code for the Deep Agent running in your namespace.
 
-Navigate to the **athena-aiops-deep-agent** repository. This is the source code for the Deep Agent running in your namespace. Let's look at two key files.
-
-=== How agents are defined: `subagents.yaml`
-
-Browse to https://github.com/rhpds/athena-aiops-deep-agent/blob/main/subagents.yaml[subagents.yaml^] in the repository root. This is the file you saw annotated in Module 2 — it defines every specialist agent in the system:
-
+. Browse to `subagents.yaml` in the repository root
++
+This is the file you saw annotated in Module 2 — it defines every specialist agent in the system:
++
 [cols="1,2",options="header"]
 |===
 |Agent |Domain
@@ -40,31 +42,25 @@ Browse to https://github.com/rhpds/athena-aiops-deep-agent/blob/main/subagents.y
 |`reviewer`
 |Quality validation — checks ticket coherence before submission
 |===
-
++
 Each agent has the same structure you saw in Module 2: `description`, `model`, `system_prompt`, `tools`, and `skills`.
 
-=== How skills are defined: `skills/` directory
-
-Browse to the https://github.com/rhpds/athena-aiops-deep-agent/tree/main/skills[skills/^] directory. Each subdirectory contains a `SKILL.md` file — a markdown document that gets loaded into the agent's context as reference knowledge.
-
-For example, `skills/analyze-linux-failure/SKILL.md` contains a structured workflow:
-
-. Read the full incident context
-. Identify the Linux subsystem (package management, systemd, SELinux, filesystem)
-. Determine root cause by correlating Ansible error output with the Linux issue
-. Assess risk and confidence
-. Recommend specific actions with exact commands
-
+. Browse to the `skills/` directory
++
+Each subdirectory contains a `SKILL.md` file — a markdown document that gets loaded into the agent's context as reference knowledge. For example, `skills/analyze-linux-failure/SKILL.md` contains a structured diagnostic workflow.
++
 Skills are not code — they're instructions written in plain language. Anyone who understands the domain can write or improve a skill without touching Python.
 
-== How OpenShift makes this extensible
+. Optionally, browse the Helm chart at `deploy/helm/athena/templates/`
++
+The key files are `configmap.yaml` (agent config), `pvc.yaml` (skills volume), and `deployment.yaml` (which mounts both and includes an initContainer that pre-populates the skills PVC from the image on first boot).
+
+== Exercise 3: Inspect the extensibility layer
 
 Here's where it gets interesting. In your namespace, Athena's agent configuration and skills are **not baked into the container image**. They're mounted from Kubernetes resources that you can modify at runtime.
 
-If you're curious about how this is wired up, the Helm chart that deploys Athena defines both the ConfigMap and the PVC: https://github.com/rhpds/athena-aiops-deep-agent/tree/main/deploy/helm/athena/templates[deploy/helm/athena/templates/^]. The key files are `configmap.yaml` (agent config), `pvc.yaml` (skills volume), and `deployment.yaml` (which mounts both and includes an initContainer that pre-populates the skills PVC from the image on first boot).
-
-Click the **Terminal** tab and log in to your OpenShift namespace:
-
+. Click the **Terminal** tab and log in to your OpenShift namespace:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 oc login --insecure-skip-tls-verify \
@@ -73,76 +69,133 @@ oc login --insecure-skip-tls-verify \
   {openshift_api_url} \
   --namespace {user}-agentic
 ----
++
+_Sample output:_
++
+----
+Login successful.
+Using project "user-XXXXX-agentic".
+----
 
-=== ConfigMap for agent definitions
-
-The `subagents.yaml` and `AGENTS.md` files are stored in a ConfigMap called `athena-agent-config`. You can inspect it from the **Terminal** tab:
-
+. Inspect the **ConfigMap** that holds the agent definitions:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 oc get configmap athena-agent-config -o yaml | head -20
 ----
++
+_Sample output (your results may vary):_
++
+----
+apiVersion: v1
+data:
+  AGENTS.md: |
+    # Athena Ops Manager
+    ...
+  subagents.yaml: |
+    sre_ansible:
+      description: >
+        Ansible/AAP2 specialist...
+    ...
+kind: ConfigMap
+metadata:
+  name: athena-agent-config
+  ...
+----
++
+The ConfigMap stores two files as keys in `data:`. Each key becomes a file when mounted into the pod. This means you can **add a new agent** by updating this ConfigMap — no image rebuild needed.
 
-This means you can **add a new agent** by editing the ConfigMap — no image rebuild, no redeployment of code. Just configuration.
-
-=== PVC for skills
-
-The `skills/` directory is mounted from a PersistentVolumeClaim. You can see what's on it:
-
+. Inspect the **PVC** that holds the skills:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 oc exec deployment/athena -c athena -- ls /app/skills/
 ----
++
+_Sample output:_
++
+----
+analyze-ansible-failure
+analyze-linux-failure
+analyze-networking-failure
+analyze-openshift-failure
+common
+create-ticket
+error-classifier
+lost+found
+review-ticket
+----
++
+The `skills/` directory is mounted from a PersistentVolumeClaim. You can **add new skills** by copying files onto the PVC — again, no image rebuild needed.
 
-This means you can **add new skills** by copying files onto the PVC — again, no image rebuild needed.
-
-=== The implications
-
-This architecture means you can:
-
-* **Add a new specialist agent** — edit the ConfigMap to add a new entry to `subagents.yaml`
+. Understand the implications:
++
+--
+* **Add a new specialist agent** — update the ConfigMap to add a new entry to `subagents.yaml`
 * **Add domain knowledge** — copy a new skill directory onto the PVC
 * **Improve existing agents** — edit the system prompt or skill content
 * **Change models** — switch an agent to a cheaper or more capable model
 * **Roll out changes** — restart the pod to pick up the new configuration
-
+--
++
 All without writing a single line of Python. Let's do exactly that.
 
-== Build a new agent: `sre_ssh`
+== Exercise 4: Build a new agent — `sre_ssh`
 
 Currently, when a job fails due to SSH authentication issues, the `sre_networking` agent handles it. But SSH credential failures are a specific domain that benefits from institutional knowledge — especially at Meridian Financial, where a recent policy change has deprecated shared backdoor keys.
 
 You're going to create a dedicated `sre_ssh` agent with a skill that encodes this institutional knowledge.
 
-=== Step 1: Create the skill
+=== Step 1: Create the skill on the PVC
 
-First, download the SSH analysis skill from your Gitea repository and copy it onto the PVC. This skill file contains Meridian Financial's institutional knowledge about the Q4 2025 SSH key deprecation.
-
-From the **Terminal** tab:
-
+. Create the skill directory:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 oc exec deployment/athena -c athena -- mkdir -p /app/skills/analyze-ssh-failure
 ----
 
+. Download the SSH analysis skill from your Gitea repository and copy it onto the PVC:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 curl -sL https://gitea.{openshift_cluster_ingress_domain}/{user}/agentic-devops-plays/raw/branch/main/configs/analyze-ssh-failure-SKILL.md \
   | oc exec -i deployment/athena -c athena -- sh -c 'cat > /app/skills/analyze-ssh-failure/SKILL.md'
 ----
 
-Verify the skill was created:
-
+. Verify the skill was created:
++
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- cat /app/skills/analyze-ssh-failure/SKILL.md
+oc exec deployment/athena -c athena -- head -20 /app/skills/analyze-ssh-failure/SKILL.md
 ----
++
+_Sample output:_
++
+----
+---
+name: analyze-ssh-failure
+description: SSH authentication failure analysis with institutional knowledge
+---
 
-You should see the skill content including the **Institutional Knowledge** section about the backdoor key deprecation. This is the tribal knowledge that makes this agent smarter than a generic SSH troubleshooter.
+# Analyze SSH Authentication Failure
+
+Deep analysis of AAP2 job failures caused by SSH authentication and credential issues.
+
+## Institutional Knowledge — Meridian Financial SSH Policy
+
+**CRITICAL CONTEXT (Q4 2025 Policy Change):**
+
+In late 2025, Meridian Financial deprecated all shared "backdoor" SSH keys
+in favor of per-host, per-user key pairs managed through AAP2 credentials.
+...
+----
++
+This is the tribal knowledge that makes this agent smarter than a generic SSH troubleshooter — it knows about Meridian's specific policy change.
 
 === Step 2: Update the ConfigMap with the new agent
 
-Now you need to add the `sre_ssh` agent definition to the ConfigMap. Here's what the new entry looks like:
+Here's what the new `sre_ssh` agent entry looks like:
 
 [source,yaml]
 ----
@@ -179,32 +232,39 @@ sre_ssh:
 <4> **Tools** — `web_search` lets the agent look up SSH documentation if needed
 <5> **Skills** — points to the skill you just created, plus the shared `create-ticket` and `common` skills
 
-Rather than manually editing the YAML (where a single indentation error would break the configuration), download the complete pre-built `subagents.yaml` that includes `sre_ssh` and patch the ConfigMap:
+Rather than manually editing YAML in a terminal editor (where a single indentation error would break the configuration), download the complete pre-built `subagents.yaml` that includes `sre_ssh`:
 
+[start=4]
+. Download the updated subagents configuration:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 curl -sL https://gitea.{openshift_cluster_ingress_domain}/{user}/agentic-devops-plays/raw/branch/main/configs/subagents-with-sre-ssh.yaml \
   -o /tmp/subagents-new.yaml
 ----
 
-Verify the download — you should see `sre_ssh` in the file:
-
+. Verify the download — confirm `sre_ssh` is present:
++
 [source,bash,role="execute",subs=attributes+]
 ----
-grep "^sre_" /tmp/subagents-new.yaml
+grep "^sre_\|^reviewer" /tmp/subagents-new.yaml
 ----
-
-Expected output:
++
+_Expected output:_
++
 ----
 sre_ansible:
 sre_linux:
 sre_openshift:
 sre_networking:
 sre_ssh:
+reviewer:
 ----
++
+Notice the new `sre_ssh:` entry between `sre_networking:` and `reviewer:`.
 
-Now patch the ConfigMap with the new `subagents.yaml`:
-
+. Patch the ConfigMap with the new `subagents.yaml`:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 oc create configmap athena-agent-config \
@@ -212,80 +272,116 @@ oc create configmap athena-agent-config \
   --from-file=AGENTS.md=<(oc get configmap athena-agent-config -o jsonpath='{.data.AGENTS\.md}') \
   --dry-run=client -o yaml | oc apply -f -
 ----
-
-This command:
-
-* Creates a new ConfigMap definition from the downloaded file (preserving the existing `AGENTS.md`)
-* Uses `--dry-run=client -o yaml` to generate the YAML without applying it
-* Pipes it to `oc apply` which updates the existing ConfigMap in place
++
+_Expected output:_
++
+----
+configmap/athena-agent-config configured
+----
++
+This command creates a new ConfigMap definition from the downloaded file (preserving the existing `AGENTS.md`), generates the YAML with `--dry-run=client`, and pipes it to `oc apply` which updates the ConfigMap in place.
 
 === Step 3: Roll out the change
 
-Restart the Athena pod to pick up the new ConfigMap and skill:
-
+. Restart the Athena pod to pick up the new ConfigMap and skill:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 oc rollout restart deployment/athena
 ----
++
+_Expected output:_
++
+----
+deployment.apps/athena restarted
+----
 
-Wait for the new pod to come up:
-
+. Wait for the new pod to come up:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 oc rollout status deployment/athena --timeout=120s
 ----
-
-You should see `deployment "athena" successfully rolled out`.
++
+_Expected output:_
++
+----
+Waiting for deployment "athena" rollout to finish: 1 old replicas are pending termination...
+deployment "athena" successfully rolled out
+----
 
 === Step 4: Verify the new agent
 
-Let's confirm the new skill is available and the ConfigMap was updated:
-
+. Confirm the new skill is on the PVC:
++
 [source,bash,role="execute",subs=attributes+]
 ----
 oc exec deployment/athena -c athena -- ls /app/skills/analyze-ssh-failure/
 ----
++
+_Expected output:_
++
+----
+SKILL.md
+----
 
+. Confirm `sre_ssh` is in the ConfigMap:
++
 [source,bash,role="execute",subs=attributes+]
 ----
-oc get configmap athena-agent-config -o jsonpath='{.data.subagents\.yaml}' | grep -A2 "sre_ssh"
+oc get configmap athena-agent-config -o jsonpath='{.data.subagents\.yaml}' | grep -A3 "sre_ssh"
+----
++
+_Expected output:_
++
+----
+sre_ssh:
+  description: >
+    SSH and authentication specialist. Delegate SSH credential failures:
+    key rejection, permission denied (publickey), backdoor key deprecation,
 ----
 
-You should see the `sre_ssh` entry and the skill file.
-
-== Test the new agent
+== Exercise 5: Test the new agent
 
 Now let's trigger a failure that your new `sre_ssh` agent should handle.
 
-In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates** and launch **02 Ping RHEL Admin** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
+. In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates**
 
+. Launch **02 Ping RHEL Admin** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
++
 This job uses the `admin-backdoor-key` credential — a deprecated shared key that will be rejected by the target host. This is exactly the scenario your `sre_ssh` agent was designed to handle.
 
-Watch the job fail, then wait 1-3 minutes for the pipeline to process it.
+. Watch the job fail, then wait 1-3 minutes for the pipeline to process it
 
-=== Check the results
-
-In the **Kira** tab (log in with `{user}` / `{password}` if prompted), look for the new ticket. Pay attention to:
-
+. In the **Kira** tab (log in with `{user}` / `{password}` if prompted), look for the new ticket. Pay attention to:
++
+--
 * Does the analysis mention the **deprecated backdoor key**?
 * Does it reference the **Q4 2025 policy change**?
 * Does the recommended action suggest creating a **per-host credential** instead?
-
+--
++
 This is the power of skills — you encoded Meridian Financial's institutional knowledge into a markdown file, and the agent used it to provide context-aware analysis that goes beyond generic SSH troubleshooting.
++
+TIP: Use the **AI Chatbot** to ask follow-up questions about the analysis
 
-In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), check `#support` for the notification.
+. In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), check `#support` for the notification
 
-== Check on the monitoring agent
+== Exercise 6: Check the monitoring agent
 
-While you were building your new agent, the **08 Deploy Monitoring Agent** job from the beginning of this module should have been processed by the pipeline. Check Kira for that ticket too — it should be an OpenShift/security context failure handled by `sre_openshift`.
+While you were building your new agent, the **08 Deploy Monitoring Agent** job from Exercise 1 should have been processed by the pipeline.
 
+. In the **Kira** tab, look for the monitoring agent ticket — it should be an OpenShift/security context failure handled by `sre_openshift`
+
+. Compare the two tickets: the SSH failure handled by your new `sre_ssh` and the OpenShift failure handled by `sre_openshift`
++
 This demonstrates the routing in action: two different failures, two different specialist agents, each with domain-specific analysis.
 
 == Takeaways
 
 * Athena's agents and skills are defined in configuration, not code
 * OpenShift provides the extensibility mechanism: ConfigMap for agents, PVC for skills
-* Adding a new specialist agent is a 3-step process: create the skill, edit the ConfigMap, restart the pod
+* Adding a new specialist agent is a 3-step process: create the skill, update the ConfigMap, restart the pod
 * Skills encode institutional knowledge in plain language — anyone who understands the domain can write them
 * The `ops_manager` automatically routes failures to the right specialist based on the agent's `description` field
 * You just extended an AI operations team without writing any Python
