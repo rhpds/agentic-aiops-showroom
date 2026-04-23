@@ -1,116 +1,100 @@
 = Conclusion
 :icons: font
 
-Meridian Financial's compliance window opened on time.
-The FCA auditors received a timestamped incident report — root cause confirmed, cascade timeline documented, remediation approved, audit trail complete.
-The on-call engineer approved the fix from RocketChat in 90 seconds.
-
-You built the system that made that possible.
+You started this workshop as a senior SRE at Meridian Financial, drowning in failed Ansible jobs and compliance deadlines. You end it with a fully operational AI incident response team — built on open source models, running on OpenShift, extensible without writing code, and auditable enough for regulators.
 
 == What you accomplished
 
-In this workshop, you progressed from understanding a real operational problem to building a production-relevant agentic AI system:
-
 [cols="1,2",options="header"]
 |===
-|Module |Outcome
+|Module |What you did
 
-|1 — The Problem Domain
-|Understood how Ansible Controller failures become Kira tickets and why compliance context changes everything about how you respond
+|1 -- The Problem Domain
+|Explored AAP2, Kira, and Rocket.Chat; traced an AI-generated ticket back to the failed job that caused it; understood the Deep Agents pipeline
 
-|2 — Your Environment
-|Established connectivity across all platform services and made your first Red Hat MaaS API call
+|2 -- Your First Failure
+|Launched a job yourself, watched it fail, and examined the full pipeline from webhook to ticket to notification; broke down the `sre_linux` subagent YAML
 
-|3 — Your First SRE Agent
-|Built a single-turn LangChain agent with tool use and a structured triage prompt; felt its limits firsthand
+|3 -- Your Agentic DevOps Team
+|Built and deployed a new `sre_ssh` specialist agent with institutional knowledge about Meridian's backdoor key deprecation — using ConfigMap and PVC, no code changes
 
-|4 — Deep Agents & Subagents
-|Implemented a supervisor/subagent architecture with context isolation; improved root cause quality over single-turn triage
+|4 -- Open Source Models
+|Swapped every specialist agent from `claude-sonnet-4-6` to `qwen3-235b`; evaluated OSS ticket quality against frontier; understood cost, sovereignty, and security tradeoffs
 
-|5 — Compliance & the Human Loop
-|Built risk classification, human approval gates, and a compliance audit trail; understood the OSS vs. Frontier model tradeoff
-
-|6 — Full-Stack Incident Response
-|Orchestrated a multi-ticket cascade investigation across VM and OpenShift layers; measured real MTTR improvement
+|5 -- Full OSS Control & Autonomy
+|Switched the `ops_manager` itself to OSS; explored the Human in/on/out of the Loop spectrum; assessed which tickets could safely move to higher autonomy
 |===
+
+== OpenShift is the natural home for Agentic AI
+
+Throughout this workshop, you used OpenShift primitives to manage an AI system:
+
+* **ConfigMaps** to define and update agent configurations — `oc edit` or `oc apply` to add a new specialist
+* **PersistentVolumeClaims** to store and extend skills — `oc cp` to add domain knowledge
+* **Environment variables** to switch models — `oc set env` to go from frontier to OSS in one command
+* **Rolling restarts** to deploy changes — `oc rollout restart` for zero-downtime updates
+* **Resource limits** and **quotas** to control infrastructure costs
+* **Routes** and **Services** for secure internal communication between agents and downstream systems
+
+These are the same tools your team uses for any application on OpenShift. AI agents aren't special infrastructure — they're applications that happen to call LLMs. Treating them as such makes them manageable, observable, and governable.
+
+This applies beyond AIOps. The same pattern works for any agentic AI workload: customer service agents, code review assistants, compliance monitors, data pipeline orchestrators. If it runs on OpenShift, it inherits the operational maturity of the platform.
+
+== Red Hat OpenShift AI MaaS — why it matters
+
+You used MaaS throughout this workshop without installing, configuring, or managing a single GPU. Here's what that gave you:
+
+* **Model portfolio** — access to both frontier (Claude, Gemini) and open source (Qwen, LLaMA Scout, Minimax) models through a single API endpoint
+* **No per-token billing** — OSS models run on Red Hat's infrastructure at a fixed cost; no usage surprises at scale
+* **Data sovereignty** — your job logs, error messages, and system topology never left the platform; critical for regulated environments like Meridian Financial
+* **Security** — no external API keys to manage or risk leaking; all inference traffic stays internal
+* **Model flexibility** — switch models per agent, per task, or per risk level with a single configuration change
+* **GPU abstraction** — models run across Nvidia and Intel GPUs utilizing Red Hat OpenShift AI and vLLM; you consume an API, not hardware
+
+The combination of MaaS + OpenShift means you can run a production AI operations team where the models, the agents, and the data all stay within your controlled environment.
 
 == Key concepts to carry forward
 
-*Context isolation is an architecture decision, not an optimization*
+*The harness matters more than the model*
 
-Subagents don't share context windows — this is why findings stay clean and supervisor reasoning stays reliable.
-When you design multi-agent systems, think first about context boundaries, not tool lists.
+A well-designed agentic harness like Deep Agents — with focused context, specialist delegation, structured skills, and quality review — gets excellent results from open source models. The framework compensates for the capability gap.
 
-*The prompt is the policy*
+*Skills are institutional knowledge made actionable*
 
-`risk_classifier.py` is code, but `prompts/supervisor.txt` is policy.
-The instructions you give an agent — what it must do, must not do, and must ask about — are your compliance surface.
-They require the same governance as any other policy document at Meridian Financial.
-
-*Model selection is a portfolio decision*
-
-You used five different models across six modules.
-No single model is right for every task.
-`gpt-oss-20b` for speed. `gpt-oss-120b` for reasoning. `qwen3-235b` for complex analysis. `gemini-2.5-pro` for long context.
-Red Hat MaaS gives you access to the portfolio; your agent logic makes the selection.
+The `sre_ssh` skill you wrote in Module 3 encoded Meridian's specific policy about backdoor key deprecation. That knowledge was previously trapped in a runbook, a wiki page, or someone's head. Now it's part of the agent's reasoning — and it works with any model.
 
 *Autonomy is a spectrum, not a switch*
 
-Human-in, human-on, human-out — these are distinct patterns for distinct risk levels.
-The engineering work is building the classifier that routes correctly.
-The governance work is deciding what goes in each bucket.
-Both matter.
+Human-in, human-on, human-out — these are distinct patterns for distinct risk levels. The engineering work is building the pipeline. The governance work is deciding how much autonomy to grant at each risk level.
 
-*MTTR improvement comes from the investigation phase, not the execution phase*
+*Configuration, not code*
 
-Your agent reduced time-to-root-cause and time-to-compliance-report dramatically.
-Remediation execution time (re-running the AAP job) is the same.
-Set expectations accordingly when presenting this to stakeholders.
+You added a new specialist agent, switched models twice, and deployed institutional knowledge — all without writing Python. YAML, markdown, and `oc` commands. That's the extensibility story.
 
 == References
 
 === LangChain & Deep Agents
 
+* link:https://blog.langchain.com/deep-agents/[Introducing Deep Agents^]
+* link:https://blog.langchain.com/using-skills-with-deep-agents/[Using Skills with Deep Agents^]
+* link:https://blog.langchain.com/building-multi-agent-applications-with-deep-agents/[Building Multi-Agent Applications^]
 * link:https://python.langchain.com/docs/[LangChain Documentation^]
-* link:https://python.langchain.com/docs/concepts/agents/[LangChain Agents Concepts^]
-* link:https://python.langchain.com/docs/how_to/agent_executor/[AgentExecutor Guide^]
 
-=== Red Hat MaaS & LiteLLM
+=== Red Hat OpenShift AI & MaaS
 
-* link:https://litellm.ai/docs/[LiteLLM Documentation^]
 * link:https://www.redhat.com/en/technologies/cloud-computing/openshift-ai[Red Hat OpenShift AI^]
 
 === Ansible Automation Platform
 
 * link:https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.5[AAP 2.6 Documentation^]
-* link:https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.5/html/automation_controller_user_guide[Automation Controller User Guide^]
 
 === OpenShift
 
 * link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.20[OpenShift 4.20 Documentation^]
 
-=== Kira & RocketChat
-
-// TODO: Add links to Kira documentation and internal RocketChat workspace once published
-
-=== Agentic AI patterns (further reading)
+=== Agentic AI patterns
 
 * link:https://www.anthropic.com/research/building-effective-agents[Building Effective Agents — Anthropic^]
-* link:https://arxiv.org/abs/2309.07864[ReAct: Reasoning and Acting in Language Models^]
-
-== What's next
-
-This workshop covered the foundations of a production-grade agentic AI incident response system.
-There is significantly more to build:
-
-* *Memory and learning*: agents that remember past incidents and improve triage accuracy over time
-* *Proactive operations*: shift from reactive ticket response to predictive failure detection
-* *Multi-cluster orchestration*: extend `sre_ocp_agent` across multiple OpenShift clusters
-* *Playbook generation*: agent that not only diagnoses but drafts the Ansible fix
-* *Integration with change management*: agent that opens, tracks, and closes change records in your ITSM system
-
-The lab repository at {gitea_url} will continue to evolve.
-Issues, feedback, and contributions welcome via {rocketchat_url} `#lb2645-feedback`.
 
 == Thank you
 
@@ -118,6 +102,4 @@ Issues, feedback, and contributions welcome via {rocketchat_url} `#lb2645-feedba
 
 *LB 2645 — Red Hat Summit 2026*
 
-Built with: LangChain Deep Agents · Red Hat MaaS · Ansible Automation Platform · OpenShift 4.20 · Kira · RocketChat
-
-// TODO: Add co-authors and contributors before final delivery
+Built with: LangChain Deep Agents, Red Hat OpenShift AI MaaS, Ansible Automation Platform 2.6, OpenShift 4.20, Kira, Rocket.Chat

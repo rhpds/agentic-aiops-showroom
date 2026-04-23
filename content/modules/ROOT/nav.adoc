@@ -12,4 +12,4 @@
 
 .Wrap-up
 * xref:09-conclusion.adoc[Conclusion]
-* xref:02-details.adoc[Details & Setup]
+// * xref:02-details.adoc[Details & Setup]
