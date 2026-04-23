@@ -5,7 +5,22 @@ nav:
   - modules/ROOT/nav.adoc
 asciidoc:
   attributes:
+    experimental: true
+    page-pagination: true
+    showroom-collection-version: v1.6.8
     guid: 12345
     user: user-12345
     password: deeper-agents
     openshift_api_url: "https://openshift.example.com:6443"
+    openshift_console_url: https://console-openshift-console.apps.cluster-GUID.opentlc.com
+    openshift_cluster_ingress_domain: apps.cluster-GUID.opentlc.com
+    aap2_url: https://aap-aap.apps.cluster-GUID.opentlc.com
+    aap2_username: user-GUID-agentic
+    aap2_password: replace-me
+    kira_url: https://kira-frontend-user-GUID-agentic.apps.cluster-GUID.opentlc.com
+    kira_username: user-GUID
+    kira_password: replace-me
+    rocketchat_url: https://rocketchat-user-GUID-agentic.apps.cluster-GUID.opentlc.com
+    athena_url: https://athena-user-GUID-agentic.apps.cluster-GUID.opentlc.com
+    gitea_url: https://gitea.apps.cluster-GUID.opentlc.com
+    gitea_username: user-GUID
