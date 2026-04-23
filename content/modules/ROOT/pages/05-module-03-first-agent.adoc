@@ -344,6 +344,8 @@ _Expected output:_
 configmap/athena-agent-config configured
 ----
 +
+NOTE: You may see a Warning about a missing `kubectl.kubernetes.io/last-applied-configuration` annotation — this is safe to ignore. It only appears the first time because the ConfigMap was originally created by Helm, not `oc apply`
++
 This command creates a new ConfigMap definition from the downloaded file (preserving the existing `AGENTS.md`), generates the YAML with `--dry-run=client`, and pipes it to `oc apply` which updates the ConfigMap in place.
 
 === Step 3: Roll out the change
