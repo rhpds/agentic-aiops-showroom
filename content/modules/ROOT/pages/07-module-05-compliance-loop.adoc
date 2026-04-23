@@ -64,6 +64,26 @@ This single command updates the environment variable and automatically triggers 
 This is another reason why AI agents belong on OpenShift and Kubernetes. The platform gives you operational primitives — env vars, ConfigMaps, PVCs, rolling restarts — that make AI systems configurable, observable, and manageable using the same tools your team already knows. `oc set env` is the same command you'd use to reconfigure any application.
 ====
 
+. Confirm the model was set:
++
+[source,bash,role="execute",subs=attributes+]
+----
+oc get deployment athena -o jsonpath='{.spec.template.spec.containers[0].env}' | python3 -c "
+import sys, json
+envs = json.load(sys.stdin)
+for e in envs:
+    if e['name'] == 'OPS_MANAGER_MODEL':
+        print(f\"OPS_MANAGER_MODEL = {e['value']}\")
+        break
+"
+----
++
+_Expected output:_
++
+----
+OPS_MANAGER_MODEL = qwen3-235b
+----
+
 . Wait for the rollout:
 +
 [source,bash,role="execute",subs=attributes+]
