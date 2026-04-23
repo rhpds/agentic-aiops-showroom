@@ -167,6 +167,8 @@ metadata:
 ----
 +
 The ConfigMap stores two files as keys in `data:`. Each key becomes a file when mounted into the pod. This means you can **add a new agent** by updating this ConfigMap — no image rebuild needed.
++
+TIP: Use `oc get configmap athena-agent-config -o yaml | less` to browse the entire file — you'll see the full `AGENTS.md` and `subagents.yaml` contents
 
 . Inspect the **PVC** that holds the skills:
 +
