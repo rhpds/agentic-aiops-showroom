@@ -159,7 +159,7 @@ oc exec deployment/athena -c athena -- mkdir -p /app/skills/analyze-ssh-failure
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-curl -sL https://gitea.{openshift_cluster_ingress_domain}/{user}/agentic-devops-plays/raw/branch/main/configs/analyze-ssh-failure-SKILL.md \
+curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/analyze-ssh-failure-SKILL.md \
   | oc exec -i deployment/athena -c athena -- sh -c 'cat > /app/skills/analyze-ssh-failure/SKILL.md'
 ----
 
@@ -239,7 +239,7 @@ Rather than manually editing YAML in a terminal editor (where a single indentati
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-curl -sL https://gitea.{openshift_cluster_ingress_domain}/{user}/agentic-devops-plays/raw/branch/main/configs/subagents-with-sre-ssh.yaml \
+curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/subagents-with-sre-ssh.yaml \
   -o /tmp/subagents-new.yaml
 ----
 

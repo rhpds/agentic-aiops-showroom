@@ -36,6 +36,8 @@ asciidoc:
     kira_password: replace-me
     rocketchat_url: https://rocketchat-user-GUID-agentic.apps.cluster-GUID.opentlc.com
     athena_url: https://athena-user-GUID-agentic.apps.cluster-GUID.opentlc.com
+    gitea_url: https://gitea.apps.cluster-GUID.opentlc.com
+    gitea_username: user-GUID
 
 output:
   dir: ./www
