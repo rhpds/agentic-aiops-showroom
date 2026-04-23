@@ -8,8 +8,7 @@
 * xref:04-module-02-environment.adoc[Module 2: Your First Failure]
 * xref:05-module-03-first-agent.adoc[Module 3: Understanding your Agentic DevOps Team]
 * xref:06-module-04-deep-agents.adoc[Module 4: Open Source Models]
-* xref:07-module-05-compliance-loop.adoc[Module 5: Compliance & the Human Loop]
-* xref:08-module-06-advanced-infra.adoc[Module 6: Full-Stack Incident Response]
+* xref:07-module-05-compliance-loop.adoc[Module 5: Can OSS Take Full Control?]
 
 .Wrap-up
 * xref:09-conclusion.adoc[Conclusion]

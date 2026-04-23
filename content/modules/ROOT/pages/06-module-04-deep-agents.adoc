@@ -208,6 +208,6 @@ TIP: Use the **AI Chatbot** with `qwen3-235b` selected to ask follow-up question
 ** **Security** — no external API keys, no egress traffic, complete audit trail
 * The choice between frontier and OSS isn't binary — you can mix models per agent based on task complexity
 
-*Next*: Module 5 explores compliance and human-in-the-loop patterns.
+*Next*: Module 5 — switch the ops_manager to OSS too, then explore how much autonomy you'd give an AI operations team.
 
-xref:07-module-05-compliance-loop.adoc[-> Module 5: Compliance & the Human Loop]
+xref:07-module-05-compliance-loop.adoc[-> Module 5: Can Open Source Models Take Full Control?]

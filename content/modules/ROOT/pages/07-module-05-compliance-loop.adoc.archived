@@ -1,0 +1,364 @@
+= Module 5: Compliance & the Human Loop
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+Your Deep Agent can now investigate.
+It has a root cause.
+It knows what needs to be fixed.
+
+Should it fix it?
+
+At Meridian Financial, this question isn't rhetorical — it has a regulatory answer.
+The FCA requires documented evidence that a qualified person reviewed and authorized remediation actions on production systems.
+An agent that acts autonomously without that record isn't just a technical risk; it's a compliance violation.
+
+But "always require human approval" defeats the purpose of automation.
+A 2am SSH key rotation on seven non-critical dev hosts doesn't need a human in the loop.
+A production database configuration change during trading hours absolutely does.
+
+This module is about building the logic between those two extremes — and making it auditable.
+
+toc::[]
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Implement human-in/on/out-of-the-loop patterns as explicit agent decision gates
+* Generate compliance-ready audit trail entries for every agent action
+* Configure risk-based routing: when the agent acts autonomously vs. when it escalates
+* Understand the tradeoffs between OSS and Frontier models for compliance-sensitive contexts
+
+== Concept: The three loop patterns
+
+Before writing code, align on terminology:
+
+[cols="1,2,2",options="header"]
+|===
+|Pattern |Definition |When to use at Meridian
+
+|*Human in the loop*
+|Agent cannot act without human approval for every action
+|High-risk changes: production DB config, firewall rules, user access changes
+
+|*Human on the loop*
+|Agent acts, but a human monitors and can intervene
+|Medium-risk: automated remediation with Slack notification and 5-minute hold before applying
+
+|*Human out of the loop*
+|Agent acts fully autonomously, logs everything for post-hoc review
+|Low-risk, well-understood, frequently occurring: SSH key rotation on dev hosts, transient timeout retries
+|===
+
+Your agent's job is to *classify the risk* and *route accordingly*.
+This classification logic is your primary compliance surface.
+
+NOTE: The risk classification logic embedded in your agent is subject to change control at Meridian Financial.
+Every modification to this logic must be reviewed, approved, and version-controlled — just like any other compliance-critical configuration.
+
+== Exercise 1: Implement a risk classifier
+
+Open `module-05-compliance/risk_classifier.py`:
+
+// TODO: Confirm final file structure for module-05
+
+[source,python]
+----
+# risk_classifier.py
+from enum import Enum
+
+class RiskLevel(Enum):
+    LOW = "low"       # Human out of the loop — agent acts autonomously
+    MEDIUM = "medium" # Human on the loop — agent acts, human can intervene
+    HIGH = "high"     # Human in the loop — agent must get approval before acting
+
+class RiskClassifier:
+    """
+    Classifies remediation risk based on ticket characteristics.
+    This logic is compliance-critical and must be reviewed under change control.
+    Version: 0.1 (draft — pending compliance review)
+    """
+
+    # Environments where autonomous action is NEVER permitted
+    RESTRICTED_ENVIRONMENTS = ["prod-finance-east", "prod-finance-west", "prod-trading"]
+
+    # Actions that always require human approval
+    HIGH_RISK_ACTIONS = [
+        "modify_firewall_rules",
+        "change_user_credentials",
+        "modify_database_config",
+        "restart_trading_services",
+    ]
+
+    # Error classes where auto-remediation is well-understood and safe
+    AUTO_REMEDIABLE_CLASSES = [
+        "TRANSIENT_NETWORK_TIMEOUT",
+        "SSH_KEY_ROTATION_DEV",    # Only in non-restricted environments
+        "DISK_CLEANUP_TEMP",
+    ]
+
+    def classify(self, ticket: dict, proposed_action: str) -> RiskLevel:
+        # Always HIGH if in a restricted environment
+        if ticket.get("inventory") in self.RESTRICTED_ENVIRONMENTS:
+            return RiskLevel.HIGH
+
+        # Always HIGH if the action is on the high-risk list
+        if proposed_action in self.HIGH_RISK_ACTIONS:
+            return RiskLevel.HIGH
+
+        # HIGH if SLA deadline is within 30 minutes (urgency elevates risk of errors)
+        if ticket.get("sla_minutes_remaining", 999) < 30:
+            return RiskLevel.HIGH
+
+        # MEDIUM if more than 30% of inventory hosts are affected
+        if ticket.get("failure_ratio", 0) > 0.3:
+            return RiskLevel.MEDIUM
+
+        # LOW only for known auto-remediable error classes in non-restricted environments
+        if ticket.get("error_class") in self.AUTO_REMEDIABLE_CLASSES:
+            return RiskLevel.LOW
+
+        # Default: require human review
+        return RiskLevel.MEDIUM
+----
+
+. Review the classifier logic.
+. Identify: which rule covers the KIRA-0042 scenario (SSH_AUTH_FAILURE, 7/14 hosts, `prod-finance-east`)?
+. What risk level does it return? Why?
+
+=== Verify
+
+✓ You can read and explain each classification rule
+
+✓ You can trace KIRA-0042 through the classifier and predict the output risk level
+
+== Exercise 2: Implement human-in-the-loop approval
+
+For HIGH risk actions, the agent must post a request to RocketChat and wait for a human to respond before proceeding.
+
+[source,python]
+----
+# approval_gate.py
+import time
+import os
+from tools.rocket_tool import post_to_rocketchat, wait_for_approval
+
+class ApprovalGate:
+    """
+    Posts an approval request to RocketChat and blocks until a human responds.
+    Timeout defaults to 10 minutes — if no response, escalates to on-call.
+    """
+
+    APPROVAL_CHANNEL = "#lb2645-agent"
+    COMPLIANCE_CHANNEL = "#lb2645-compliance"
+    TIMEOUT_SECONDS = 600  # 10 minutes
+
+    def request_approval(self, ticket_id: str, proposed_action: str,
+                         evidence: str, risk_level: str) -> bool:
+        """
+        Returns True if approved, False if rejected or timed out.
+        Every call is logged to the compliance channel regardless of outcome.
+        """
+        message = f"""
+🔐 *APPROVAL REQUIRED* — Risk Level: {risk_level.upper()}
+
+*Ticket*: {ticket_id}
+*Proposed Action*: `{proposed_action}`
+
+*Evidence*:
+{evidence}
+
+Reply ✅ *approve* or ❌ *reject* in this thread within 10 minutes.
+Silence = auto-escalate to on-call.
+        """
+
+        post_to_rocketchat(channel=self.APPROVAL_CHANNEL, message=message)
+        self._log_compliance(ticket_id, proposed_action, "PENDING_APPROVAL")
+
+        approved = wait_for_approval(
+            channel=self.APPROVAL_CHANNEL,
+            timeout=self.TIMEOUT_SECONDS
+        )
+
+        outcome = "APPROVED" if approved else "REJECTED_OR_TIMEOUT"
+        self._log_compliance(ticket_id, proposed_action, outcome)
+
+        return approved
+
+    def _log_compliance(self, ticket_id: str, action: str, status: str):
+        """Every gate interaction is logged for audit purposes."""
+        import datetime
+        entry = (
+            f"[{datetime.datetime.utcnow().isoformat()}Z] "
+            f"TICKET={ticket_id} ACTION={action} STATUS={status} "
+            f"AGENT=sre-supervisor"
+        )
+        post_to_rocketchat(channel=self.COMPLIANCE_CHANNEL, message=f"```\n{entry}\n```")
+----
+
+NOTE: `wait_for_approval()` is provided in the starter `tools/rocket_tool.py`.
+It polls the RocketChat thread for a reply from a user with the `sre-approver` role.
+// TODO: Document the RocketChat bot user and role configuration for this workshop
+
+=== Verify
+
+✓ You can read and explain the approval gate logic
+
+✓ You can identify where the compliance audit log entry is written
+
+✓ You understand the 10-minute timeout behavior
+
+== Exercise 3: Wire the risk classifier and approval gate into the supervisor
+
+// TODO: Add full supervisor update for module-05 with risk classifier integration
+
+Open `module-05-compliance/supervisor.py` and trace how it:
+
+. Gets the Kira ticket
+. Runs subagent investigations
+. Generates a proposed remediation action
+. Calls the risk classifier
+. Routes based on risk level:
++
+[source,python]
+----
+risk = classifier.classify(ticket, proposed_action)
+
+if risk == RiskLevel.LOW:
+    # Human out of the loop — act immediately
+    remediate(ticket, proposed_action)
+    log_compliance(ticket_id, proposed_action, "AUTO_REMEDIATED")
+
+elif risk == RiskLevel.MEDIUM:
+    # Human on the loop — act after 5-minute hold, notify channel
+    notify_rocketchat(f"⏳ Acting in 5 min unless rejected: {proposed_action}")
+    time.sleep(300)
+    if not veto_received():
+        remediate(ticket, proposed_action)
+        log_compliance(ticket_id, proposed_action, "AUTO_REMEDIATED_NO_VETO")
+
+elif risk == RiskLevel.HIGH:
+    # Human in the loop — block until approved
+    approved = approval_gate.request_approval(
+        ticket_id, proposed_action, evidence, risk.value
+    )
+    if approved:
+        remediate(ticket, proposed_action)
+        log_compliance(ticket_id, proposed_action, "REMEDIATED_AFTER_APPROVAL")
+    else:
+        escalate(ticket_id, "Approval rejected or timed out")
+        log_compliance(ticket_id, proposed_action, "ESCALATED")
+----
+
+. Run the full supervisor:
++
+[source,bash]
+----
+cd ~/workshop/module-05-compliance
+python supervisor.py
+----
+
+. When the approval request appears in RocketChat `#lb2645-agent`, respond with ✅ `approve`.
+
+. Check `#lb2645-compliance` for the audit trail entry.
+
+=== Verify
+
+✓ Supervisor correctly classifies KIRA-0042 as HIGH risk (prod-finance-east inventory)
+
+✓ Approval request appears in `#lb2645-agent` with ticket ID, proposed action, and evidence
+
+✓ After ✅ approval, the remediation proceeds and a REMEDIATED_AFTER_APPROVAL entry appears in `#lb2645-compliance`
+
+✓ Compliance channel shows timestamped entries for PENDING_APPROVAL and APPROVED states
+
+== Exercise 4: The model compliance question
+
+In regulated environments, model selection is not purely a technical decision.
+
+Consider: your supervisor uses `gpt-oss-120b` for root cause synthesis.
+A compliance auditor asks: "Can you prove this model doesn't hallucinate remediation steps?"
+
+. Review the available models: {litellm_available_models_list}
++
+Which are Open Source? Which are Frontier (commercial)?
+For a regulated financial services firm, what additional scrutiny applies to Frontier models?
+
+. Review the implications:
++
+[cols="1,2",options="header"]
+|===
+|Model type |Compliance consideration at Meridian Financial
+
+|Open Source (llama-scout-17b, gpt-oss-20b, gpt-oss-120b, qwen3-235b)
+|Weights are inspectable. Behavior is reproducible. Can be audited by internal ML team.
+
+|Frontier (gemini-2.5-pro, minimax-m2)
+|Closed weights. May have data residency implications. Require additional DPA/vendor review.
+|===
+
+. Consider: for which steps in your agent workflow would Meridian Financial's compliance team require OSS-only models?
+
+// TODO: Add exercise where learners configure per-agent model policy based on risk classification
+
+NOTE: Red Hat MaaS routes all model calls through its governed infrastructure regardless of model type.
+No data leaves to an external provider directly — Red Hat intermediates and enforces data handling policies.
+Discuss with your facilitator what this means for Meridian's specific compliance requirements.
+
+=== Verify
+
+✓ You can classify each available model as OSS or Frontier
+
+✓ You can articulate at least one compliance reason to prefer OSS models for compliance-sensitive steps
+
+✓ You understand how Red Hat MaaS changes (but does not eliminate) the data residency conversation
+
+== Troubleshooting
+
+*Issue*: `wait_for_approval()` times out immediately
+*Solution*: The approval polling requires a RocketChat bot user with `sre-approver` role.
+Confirm the bot is configured: check `tools/rocket_tool.py` for the role requirement.
+For testing, a facilitator can manually post "approve" to `#lb2645-agent`.
+
+*Issue*: Compliance log entries appear out of order
+*Solution*: Multiple async events may be writing to `#lb2645-compliance` simultaneously.
+The entries are timestamped — use the timestamp, not message order, for audit reconstruction.
+
+*Issue*: Risk classifier returns `MEDIUM` when you expected `HIGH` for KIRA-0042
+*Solution*: Verify the ticket's `inventory` field matches exactly: `prod-finance-east`.
+Kira may return the inventory with a trailing space or different casing.
+Add a `.strip().lower()` comparison to the classifier.
+
+*Issue*: After approval, `remediate()` fails with a permission error
+*Solution*: In this workshop, remediation actions are intentionally limited (no production changes).
+The `remediate()` stub simulates action and logs it — no actual AAP job is triggered.
+// TODO: Clarify exact remediation scope for the workshop
+
+== Takeaways
+
+*What you built in this module*:
+
+* A risk classifier that maps ticket characteristics and proposed actions to human-loop patterns
+* An approval gate that blocks agent execution until a human responds in RocketChat
+* A compliance audit trail written to `#lb2645-compliance` for every agent decision point
+* An understanding of the distinction between OSS and Frontier model compliance considerations
+
+*The human loop as a design decision, not a fallback*:
+
+Autonomous agents don't fail because they have too little human oversight — they fail because human oversight is applied uniformly, regardless of risk.
+Low-risk, high-frequency events get the same scrutiny as high-risk, rare ones.
+The result: either operators are overwhelmed (if everything requires approval) or nothing is reviewed (if the overhead makes review impractical).
+
+Risk-based routing — and making that routing auditable — is the engineering answer to that problem.
+
+*The MaaS touchpoint*:
+
+Model selection in a regulated context isn't just about capability — it's about auditability.
+Can you reproduce the model's output? Can you inspect its weights? Can you demonstrate its behavior hasn't changed between runs?
+OSS models on Red Hat MaaS give you stronger answers to those questions than Frontier models.
+The workshop gives you both — and the judgment about when each is appropriate is part of what you're building here.
+
+*Next*: Module 6 brings it all together — a full-stack incident response scenario spanning VM and OpenShift infrastructure, with multiple failure types, cascading errors, and a compliance-ready investigation report.
+
+xref:08-module-06-advanced-infra.adoc[→ Module 6: Full-Stack Incident Response]
