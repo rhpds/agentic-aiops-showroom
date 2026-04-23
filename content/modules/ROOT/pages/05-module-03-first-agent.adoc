@@ -1,323 +1,295 @@
-= Module 3: Your First SRE Agent
+= Module 3: Understanding your Agentic DevOps Team
 :source-highlighter: rouge
-:toc: macro
-:toclevels: 1
 
-You've seen the problem.
-You've walked the environment.
-Now you build.
+In Module 2, you watched the Deep Agents pipeline analyze a failure. Now you're going to look under the hood — explore how agents and skills are defined, understand how OpenShift makes the system extensible, and then build and deploy a new specialist agent yourself.
 
-Your first agent won't be autonomous — it won't take action without your approval.
-It reads a Kira ticket, calls Red Hat MaaS to triage the error, and posts a structured analysis to RocketChat.
-One input. One model call. One output.
+== Launch another failure
 
-This is intentional.
-The best way to understand what agentic frameworks add is to first feel the boundary of what a single LLM call can do — and where it falls short.
+Let's start a job running so the pipeline has something to work on while we explore.
 
-toc::[]
+In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates** and launch **08 Deploy Monitoring Agent** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
 
-== Learning objectives
+This job deploys an application with a security context that OpenShift will reject — a different failure domain from the package issue in Module 2. Let it run in the background while we explore the architecture.
 
-By the end of this module, you'll be able to:
+== Explore the Athena codebase
 
-* Structure a LangChain agent with a tool, a prompt, and a model
-* Make a real MaaS inference call against a live Kira ticket
-* Post structured output to RocketChat from your agent
-* Identify where a single-agent, single-turn approach hits its limits
+In the **Gitea** tab (log in with `{user}` / `{password}` if prompted), navigate to the `agentic-devops-plays` repository. This contains the playbooks behind your job templates.
 
-== Exercise 1: Clone the starter code
+But the more interesting repository is the Athena application itself. Open a new browser tab and navigate to:
 
-Your workshop repository in Gitea contains a starter Python project for each module.
+https://github.com/rhpds/athena-aiops-deep-agent
 
-[source,bash]
+This is the source code for the Deep Agent running in your namespace. Let's look at two key files.
+
+=== How agents are defined: `subagents.yaml`
+
+Browse to `subagents.yaml` in the repository root. This is the file you saw annotated in Module 2 — it defines every specialist agent in the system:
+
+[cols="1,2",options="header"]
+|===
+|Agent |Domain
+
+|`sre_ansible`
+|Playbook syntax, role/collection errors, credential issues, execution environments
+
+|`sre_linux`
+|Package management, systemd, SELinux, filesystem, Satellite content
+
+|`sre_openshift`
+|Pod lifecycle, image pull, RBAC, operators, namespace/quota
+
+|`sre_networking`
+|DNS, SSH connectivity, proxy/TLS, routing, firewall
+
+|`reviewer`
+|Quality validation — checks ticket coherence before submission
+|===
+
+Each agent has the same structure you saw in Module 2: `description`, `model`, `system_prompt`, `tools`, and `skills`.
+
+=== How skills are defined: `skills/` directory
+
+Browse to the `skills/` directory. Each subdirectory contains a `SKILL.md` file — a markdown document that gets loaded into the agent's context as reference knowledge.
+
+For example, `skills/analyze-linux-failure/SKILL.md` contains a structured workflow:
+
+. Read the full incident context
+. Identify the Linux subsystem (package management, systemd, SELinux, filesystem)
+. Determine root cause by correlating Ansible error output with the Linux issue
+. Assess risk and confidence
+. Recommend specific actions with exact commands
+
+Skills are not code — they're instructions written in plain language. Anyone who understands the domain can write or improve a skill without touching Python.
+
+== How OpenShift makes this extensible
+
+Here's where it gets interesting. In your namespace, Athena's agent configuration and skills are **not baked into the container image**. They're mounted from Kubernetes resources that you can modify at runtime:
+
+=== ConfigMap for agent definitions
+
+The `subagents.yaml` and `AGENTS.md` files are stored in a ConfigMap called `athena-agent-config`. You can inspect it from the **Terminal** tab:
+
+[source,bash,role="execute",subs=attributes+]
 ----
-# Source your environment variables if not already loaded
-source ~/agent-env.sh
-
-# Clone the workshop repository
-git clone {gitea_url}/{gitea_username}/lb2645-agent-workshop.git ~/workshop
-cd ~/workshop
-
-# Verify the directory structure
-ls -la
-----
-
-Expected structure:
-----
-lb2645-agent-workshop/
-├── module-03-first-agent/
-│   ├── agent.py          ← your starting point
-│   ├── tools/
-│   │   ├── kira_tool.py  ← reads Kira tickets
-│   │   └── rocket_tool.py← posts to RocketChat
-│   ├── prompts/
-│   │   └── triage.txt    ← system prompt for triage
-│   └── requirements.txt
-├── module-04-deep-agents/
-├── module-05-compliance/
-└── module-06-advanced/
-----
-
-// TODO: Confirm exact Gitea repo name and structure matches above
-
-[source,bash]
-----
-# Install dependencies for this module
-cd ~/workshop/module-03-first-agent
-pip install -r requirements.txt
-----
-
-=== Verify
-
-✓ Repository cloned without errors
-
-✓ `module-03-first-agent/agent.py` exists
-
-✓ `pip install` completes without dependency errors
-
-== Exercise 2: Examine the starter agent
-
-Open `module-03-first-agent/agent.py` in the Showroom code editor.
-
-[source,python]
-----
-# module-03-first-agent/agent.py
-import os
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from tools.kira_tool import get_open_ticket
-from tools.rocket_tool import post_to_rocketchat
-
-# MaaS uses an OpenAI-compatible API — no special LangChain integration needed
-llm = ChatOpenAI(
-    base_url=os.environ["MAAS_API_BASE"],
-    api_key=os.environ["MAAS_API_KEY"],
-    model="gpt-oss-20b",          # Fast, lightweight — good for triage
-    temperature=0,                 # Deterministic output for consistent triage
-)
-
-tools = [get_open_ticket, post_to_rocketchat]
-
-prompt = ChatPromptTemplate.from_messages([
-    ("system", open("prompts/triage.txt").read()),
-    ("human", "{input}"),
-    ("placeholder", "{agent_scratchpad}"),
-])
-
-agent = create_tool_calling_agent(llm, tools, prompt)
-executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-
-if __name__ == "__main__":
-    result = executor.invoke({
-        "input": "Check for the highest-severity open Kira ticket and post a triage analysis to #lb2645-agent in RocketChat."
-    })
-    print(result["output"])
+oc get configmap athena-agent-config -o yaml | head -20
 ----
 
-Note what is happening:
+This means you can **add a new agent** by editing the ConfigMap — no image rebuild, no redeployment of code. Just configuration.
 
-. The agent is given two tools — one to read from Kira, one to write to RocketChat
-. The LLM (`gpt-oss-20b` via MaaS) decides which tools to call and in what order
-. The prompt (in `prompts/triage.txt`) gives the agent its persona and constraints
-. `verbose=True` shows you the agent's reasoning — useful for understanding what it's doing
+=== PVC for skills
 
-=== Verify
+The `skills/` directory is mounted from a PersistentVolumeClaim. You can see what's on it:
 
-✓ You can open and read `agent.py` in the code editor
-
-✓ You can identify the MaaS model being used and where to change it
-
-✓ You understand the role of each tool in the agent's workflow
-
-== Exercise 3: Read the triage prompt
-
-Open `module-03-first-agent/prompts/triage.txt`.
-
-[source,text]
+[source,bash,role="execute",subs=attributes+]
 ----
-You are an SRE assistant at Meridian Financial.
-Your job is to triage infrastructure incident tickets from Kira and provide a structured first-response analysis.
-
-When given a ticket, you must:
-1. Identify the error class and assess its likely root cause based on the error detail
-2. Estimate the blast radius (how many systems are affected and what services they support)
-3. Recommend an immediate action (one of: AUTO_RESOLVE, INVESTIGATE, ESCALATE, MONITOR)
-4. Provide a one-paragraph explanation suitable for posting to the #lb2645-agent RocketChat channel
-
-Output format (strict JSON):
-{
-  "ticket_id": "<KIRA-XXXX>",
-  "error_class": "<class>",
-  "likely_cause": "<one sentence>",
-  "blast_radius": "<brief description>",
-  "recommendation": "<AUTO_RESOLVE|INVESTIGATE|ESCALATE|MONITOR>",
-  "summary": "<one paragraph for RocketChat>"
-}
-
-Rules:
-- ESCALATE immediately if SLA deadline is within 30 minutes
-- ESCALATE immediately if more than 50% of hosts in an inventory have failed
-- AUTO_RESOLVE only for known, low-risk, self-correcting errors (e.g. transient network timeouts)
-- Always include ticket_id in your output
-- Do not take any remediation action — analysis and recommendation only
+oc exec deployment/athena -c athena -- ls /app/skills/
 ----
 
-// TODO: Refine the triage prompt with real error classes from AAP production data
+This means you can **add new skills** by copying files onto the PVC — again, no image rebuild needed.
 
-The prompt defines:
+=== The implications
 
-* The agent's *persona* and *scope* ("SRE assistant at Meridian Financial")
-* *Structured output format* (JSON) — critical for downstream tools to parse reliably
-* *Hard rules* — conditions that force specific recommendations (compliance guardrails embedded in the prompt)
+This architecture means you can:
 
-=== Verify
+* **Add a new specialist agent** — edit the ConfigMap to add a new entry to `subagents.yaml`
+* **Add domain knowledge** — copy a new skill directory onto the PVC
+* **Improve existing agents** — edit the system prompt or skill content
+* **Change models** — switch an agent to a cheaper or more capable model
+* **Roll out changes** — restart the pod to pick up the new configuration
 
-✓ You can read the triage prompt and explain what each section does
+All without writing a single line of Python. Let's do exactly that.
 
-✓ You can identify the two escalation conditions and explain why they exist
+== Build a new agent: `sre_ssh`
 
-== Exercise 4: Run your first agent
+Currently, when a job fails due to SSH authentication issues, the `sre_networking` agent handles it. But SSH credential failures are a specific domain that benefits from institutional knowledge — especially at Meridian Financial, where a recent policy change has deprecated shared backdoor keys.
 
-[source,bash]
+You're going to create a dedicated `sre_ssh` agent with a skill that encodes this institutional knowledge.
+
+=== Step 1: Create the skill
+
+First, create the skill directory and SKILL.md on the PVC. From the **Terminal** tab:
+
+[source,bash,role="execute",subs=attributes+]
 ----
-cd ~/workshop/module-03-first-agent
-
-# Run the agent
-python agent.py
-----
-
-Watch the output carefully.
-With `verbose=True`, LangChain prints each step of the agent's reasoning:
-
-----
-> Entering new AgentExecutor chain...
-
-Invoking: `get_open_ticket` with `{'severity': 'HIGH'}`
-
-{'ticket_id': 'KIRA-0042', 'error_class': 'SSH_AUTH_FAILURE', ...}
-
-Invoking: `post_to_rocketchat` with `{'channel': '#lb2645-agent', 'message': '...'}`
-
-Posted to #lb2645-agent
-
-> Finished chain.
+oc exec deployment/athena -c athena -- mkdir -p /app/skills/analyze-ssh-failure
 ----
 
-. Check RocketChat `#lb2645-agent`.
-+
-Your agent's triage analysis should appear as a formatted message.
+Now create the skill file with Meridian Financial's institutional knowledge about SSH credential management:
 
-. Check the agent's JSON output in the terminal.
-+
-Verify the `recommendation` field — does it match what you'd expect for an `SSH_AUTH_FAILURE` on 7/14 hosts?
-
-. Change the model to `gpt-oss-120b` in `agent.py` and re-run.
-+
-[source,python]
+[source,bash,role="execute",subs=attributes+]
 ----
-model="gpt-oss-120b",   # Larger model — more reasoning capability
+oc exec deployment/athena -c athena -- sh -c 'cat > /app/skills/analyze-ssh-failure/SKILL.md << '\''SKILL'\''
+---
+name: analyze-ssh-failure
+description: SSH authentication failure analysis with institutional knowledge
+---
+
+# Analyze SSH Authentication Failure
+
+Deep analysis of AAP2 job failures caused by SSH authentication and credential issues.
+
+## Institutional Knowledge — Meridian Financial SSH Policy
+
+**CRITICAL CONTEXT (Q4 2025 Policy Change):**
+
+In late 2025, Meridian Financial deprecated all shared "backdoor" SSH keys
+in favor of per-host, per-user key pairs managed through AAP2 credentials.
+
+Key facts:
+- Legacy `admin-backdoor-key` credentials are **no longer authorized**
+- Each host now requires a dedicated SSH credential in AAP2
+- The old backdoor keys were rotated and revoked on all production hosts
+- Any job using a backdoor-style credential will fail with "Permission denied (publickey)"
+- This is **by design** — not a misconfiguration
+
+## Diagnostic Workflow
+
+1. **Read** the incident context: check for SSH-related errors in the job output
+2. **Identify** the credential used: look at the AAP2 credential name in the job metadata
+3. **Check for backdoor key usage**: if the credential name contains "backdoor", "shared",
+   or "admin-key", this is a deprecated credential — the fix is to create a proper per-host credential
+4. **For legitimate SSH failures**:
+   - Check if the public key is deployed to the target host authorized_keys
+   - Verify the SSH user exists on the target
+   - Check for SELinux context on .ssh directory and authorized_keys
+   - Verify SSH daemon configuration (PubkeyAuthentication, AuthorizedKeysFile)
+5. **Recommend** specific remediation:
+   - For deprecated keys: create a new per-host credential in AAP2, deploy the public key
+   - For key deployment issues: provide exact commands for key installation and permissions
+   - For SSH config issues: provide sshd_config corrections
+
+## Risk Assessment
+
+- Deprecated backdoor key usage: **high risk** — indicates a compliance gap
+- Missing authorized_keys: **medium risk** — standard operational fix
+- SSH daemon misconfiguration: **medium risk** — requires careful change management
+SKILL
+'
 ----
-+
-Does the triage analysis change? Is the `likely_cause` more specific?
 
-// TODO: Document actual model output differences observed during lab testing
+Verify the skill was created:
 
-=== Verify
+[source,bash,role="execute",subs=attributes+]
+----
+oc exec deployment/athena -c athena -- cat /app/skills/analyze-ssh-failure/SKILL.md
+----
 
-✓ `python agent.py` runs without errors
+=== Step 2: Add the agent to the ConfigMap
 
-✓ A triage message appears in RocketChat `#lb2645-agent`
+Now add the `sre_ssh` agent definition to the ConfigMap. This is the key step — you're telling the `ops_manager` that a new specialist exists and when to use it.
 
-✓ The JSON output includes all required fields: ticket_id, error_class, likely_cause, blast_radius, recommendation, summary
+[source,bash,role="execute",subs=attributes+]
+----
+oc edit configmap athena-agent-config
+----
 
-== Exercise 5: Identify the limits
+This opens the ConfigMap in your terminal editor. Find the `subagents.yaml` section and add the following **before** the `reviewer:` entry:
 
-Your first agent works — but it has significant limitations.
-Spend a few minutes testing them:
+[source,yaml]
+----
+sre_ssh:
+  description: >
+    SSH and authentication specialist. Delegate SSH credential failures:
+    key rejection, permission denied (publickey), backdoor key deprecation,
+    authorized_keys issues, and AAP2 credential misconfiguration.
+  model: claude-sonnet-4-6
+  system_prompt: |
+    You are a senior SRE specializing in SSH authentication and credential
+    management. You receive incident data from failed AAP2 jobs and perform
+    root-cause analysis on SSH-related failures.
 
-. *No memory*: Run the agent twice.
-+
-Does it remember the ticket it analyzed in the first run?
-What happens if the same ticket is still open?
+    Always:
+    - Read the incident context (incident.json) first
+    - Check the AAP2 credential name used by the failing job
+    - Determine if a deprecated backdoor key is involved
+    - Reference the analyze-ssh-failure skill for institutional knowledge
+    - Provide specific, actionable recommendations for credential remediation
 
-. *No investigation*: The agent read the Kira ticket fields, but it did not:
-+
---
-* Fetch the actual Ansible Controller job log
-* Read the playbook source from Gitea
-* Check if the affected hosts have had this error before
-* Verify whether the SSH keys on `{rhel_vm_hostname}` are actually missing
---
-+
-Its `likely_cause` is a *guess* based on the error class. Not a root cause.
+    Use the create-ticket skill to structure your analysis as a TicketPayload.
+    Set area to "networking" for all SSH-domain issues.
+  tools:
+    - web_search
+  skills:
+    - ./skills/analyze-ssh-failure/
+    - ./skills/create-ticket/
+    - ./skills/common/
+----
 
-. *No action*: The agent recommended `INVESTIGATE` but took no investigative action.
-+
-A human still has to do the work.
+IMPORTANT: YAML indentation matters. The `sre_ssh:` key must be at the same level as the other agent keys (`sre_ansible:`, `sre_linux:`, etc.). Use 2 spaces for indentation, not tabs.
 
-// TODO: Add a structured reflection exercise where learners document the gap between current and target capability
+Save and exit the editor (`:wq` in vim, or `Ctrl+X` then `Y` in nano).
 
-These are not bugs — they are design constraints of a first-generation, single-turn agent.
-Module 4 addresses them with Deep Agents and dedicated subagents.
+=== Step 3: Roll out the change
 
-=== Verify
+Restart the Athena pod to pick up the new ConfigMap and skill:
 
-✓ You can articulate at least three limitations of the single-turn agent
+[source,bash,role="execute",subs=attributes+]
+----
+oc rollout restart deployment/athena
+----
 
-✓ You understand why the `likely_cause` is a guess, not a confirmed root cause
+Wait for the new pod to come up:
 
-== Troubleshooting
+[source,bash,role="execute",subs=attributes+]
+----
+oc rollout status deployment/athena --timeout=120s
+----
 
-*Issue*: `ModuleNotFoundError: No module named 'langchain'`
-*Solution*: Run `pip install -r requirements.txt` inside `module-03-first-agent/`.
-If the error persists, check your Python version: `python3 --version` should be 3.11+.
+You should see `deployment "athena" successfully rolled out`.
 
-*Issue*: `AuthenticationError: 401` from MaaS
-*Solution*: Confirm `$MAAS_API_KEY` is set: `echo $MAAS_API_KEY`.
-If empty, re-run `source ~/agent-env.sh`.
+=== Step 4: Verify the new agent
 
-*Issue*: Agent runs but nothing appears in RocketChat
-*Solution*: Confirm `$ROCKETCHAT_URL` is set correctly and the `#lb2645-agent` channel exists.
-Check `tools/rocket_tool.py` to see the posting logic and add a `print()` for debugging.
+Let's confirm the new skill is available and the ConfigMap was updated:
 
-*Issue*: Agent outputs valid JSON but `recommendation` is always `MONITOR`
-*Solution*: The `gpt-oss-20b` model may be too small for reliable structured JSON output.
-Try `gpt-oss-120b` or add explicit instructions in the prompt: "You MUST output only valid JSON and nothing else."
+[source,bash,role="execute",subs=attributes+]
+----
+oc exec deployment/athena -c athena -- ls /app/skills/analyze-ssh-failure/
+----
 
-*Issue*: `get_open_ticket` returns empty / no tickets
-*Solution*: Your facilitator may need to trigger a test failure event.
-Use RocketChat `#lb2645-support` to request one.
+[source,bash,role="execute",subs=attributes+]
+----
+oc get configmap athena-agent-config -o jsonpath='{.data.subagents\.yaml}' | grep -A2 "sre_ssh"
+----
+
+You should see the `sre_ssh` entry and the skill file.
+
+== Test the new agent
+
+Now let's trigger a failure that your new `sre_ssh` agent should handle.
+
+In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates** and launch **02 Ping RHEL Admin** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
+
+This job uses the `admin-backdoor-key` credential — a deprecated shared key that will be rejected by the target host. This is exactly the scenario your `sre_ssh` agent was designed to handle.
+
+Watch the job fail, then wait 1-3 minutes for the pipeline to process it.
+
+=== Check the results
+
+In the **Kira** tab (log in with `{user}` / `{password}` if prompted), look for the new ticket. Pay attention to:
+
+* Does the analysis mention the **deprecated backdoor key**?
+* Does it reference the **Q4 2025 policy change**?
+* Does the recommended action suggest creating a **per-host credential** instead?
+
+This is the power of skills — you encoded Meridian Financial's institutional knowledge into a markdown file, and the agent used it to provide context-aware analysis that goes beyond generic SSH troubleshooting.
+
+In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), check `#support` for the notification.
+
+== Check on the monitoring agent
+
+While you were building your new agent, the **08 Deploy Monitoring Agent** job from the beginning of this module should have been processed by the pipeline. Check Kira for that ticket too — it should be an OpenShift/security context failure handled by `sre_openshift`.
+
+This demonstrates the routing in action: two different failures, two different specialist agents, each with domain-specific analysis.
 
 == Takeaways
 
-*What you built in this module*:
+* Athena's agents and skills are defined in configuration, not code
+* OpenShift provides the extensibility mechanism: ConfigMap for agents, PVC for skills
+* Adding a new specialist agent is a 3-step process: create the skill, edit the ConfigMap, restart the pod
+* Skills encode institutional knowledge in plain language — anyone who understands the domain can write them
+* The `ops_manager` automatically routes failures to the right specialist based on the agent's `description` field
+* You just extended an AI operations team without writing any Python
 
-* A single-turn LangChain agent that reads a Kira ticket, calls Red Hat MaaS, and posts to RocketChat
-* A structured triage prompt that embeds business rules as hard constraints — not suggestions
-* Experience with the LangChain tool-calling pattern: agent decides which tools to call, in what order, based on the goal
+*Next*: Module 4 explores Deep Agents patterns in depth — subagent delegation, context isolation, and model routing.
 
-*The MaaS touchpoint*:
-
-You called Red Hat MaaS using the OpenAI-compatible API via `ChatOpenAI` with a custom `base_url`.
-This means any LangChain code written for OpenAI works with MaaS without modification — you just change `base_url` and `api_key`.
-You also experienced the first model selection decision: `gpt-oss-20b` for speed, `gpt-oss-120b` for reasoning depth.
-
-*Where single-turn agents break*:
-
-A single LLM call can classify and recommend.
-It cannot investigate, remember, or act.
-The jump from "triage" to "root cause analysis" requires the agent to:
-
-* Fetch and read the Ansible job log (tool call)
-* Pull the playbook from Gitea (tool call)
-* SSH into the RHEL VM to verify SSH key presence (tool call)
-* Reason across all three results (multiple steps)
-* Decide whether to act or escalate (conditional logic)
-
-That's a multi-step, multi-tool, context-accumulating workflow.
-That's what Module 4 introduces.
-
-*Next*: Module 4 upgrades your agent to a Deep Agent architecture with dedicated `sre_` subagents — each specializing in one investigative task, orchestrated by a supervisor agent.
-
-xref:06-module-04-deep-agents.adoc[→ Module 4: Deep Agents & Subagents]
+xref:06-module-04-deep-agents.adoc[-> Module 4: Deep Agents & Subagents]

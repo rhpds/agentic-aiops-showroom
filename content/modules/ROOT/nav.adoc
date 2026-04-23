@@ -6,7 +6,7 @@
 .Modules
 * xref:03-module-01-problem-domain.adoc[Module 1: The Problem Domain]
 * xref:04-module-02-environment.adoc[Module 2: Your First Failure]
-* xref:05-module-03-first-agent.adoc[Module 3: Your First SRE Agent]
+* xref:05-module-03-first-agent.adoc[Module 3: Understanding your Agentic DevOps Team]
 * xref:06-module-04-deep-agents.adoc[Module 4: Deep Agents & Subagents]
 * xref:07-module-05-compliance-loop.adoc[Module 5: Compliance & the Human Loop]
 * xref:08-module-06-advanced-infra.adoc[Module 6: Full-Stack Incident Response]
