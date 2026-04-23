@@ -376,6 +376,8 @@ _Expected output:_
 Waiting for deployment "athena" rollout to finish: 1 old replicas are pending termination...
 deployment "athena" successfully rolled out
 ----
++
+A rolling restart is one of the most powerful primitives OpenShift and Kubernetes give you. It spins up a new pod with the updated configuration, waits for it to pass health checks, and only then terminates the old one — zero downtime. You just reconfigured an AI operations team in production with two commands and no service interruption.
 
 === Step 4: Verify the new agent
 
