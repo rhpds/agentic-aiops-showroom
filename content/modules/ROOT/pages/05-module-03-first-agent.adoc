@@ -13,13 +13,9 @@ This job deploys an application with a security context that OpenShift will reje
 
 == Explore the Athena codebase
 
-In the **Gitea** tab (log in with `{user}` / `{password}` if prompted), navigate to the `agentic-devops-plays` repository. This contains the playbooks behind your job templates.
+Click the **Gitea** tab. You'll see the repositories available on this cluster — no login required, the Athena repo is public.
 
-But the more interesting repository is the Athena application itself. Open a new browser tab and navigate to:
-
-https://github.com/rhpds/athena-aiops-deep-agent
-
-This is the source code for the Deep Agent running in your namespace. Let's look at two key files.
+Navigate to the **athena-aiops-deep-agent** repository. This is the source code for the Deep Agent running in your namespace. Let's look at two key files.
 
 === How agents are defined: `subagents.yaml`
 
