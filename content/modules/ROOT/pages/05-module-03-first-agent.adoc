@@ -46,8 +46,8 @@ The four `sre_*` subagents are **ephemeral** — they're created on demand when 
 
 This is a critical architectural decision. Consider what would happen if a single agent handled everything:
 
-* `ops_manager` analyzes an SSH failure — 3000 tokens of SSH debug output fills the context
-* Next, a package installation failure arrives — the SSH output is still in context, confusing the analysis
+* `ops_manager` analyzes a package failure — 3000 tokens of dnf output fills the context
+* Next, an SSH failure arrives — the package output is still in context, confusing the analysis
 * By the fifth failure, the context is bloated with irrelevant data from previous investigations
 
 Ephemeral subagents solve this. Each `sre_*` agent starts with a **fresh context** — only the incident data and its domain-specific skills. When it finishes, its context is discarded. The `ops_manager` only sees the final `TicketPayload` result, not the specialist's internal reasoning. This keeps every analysis clean and focused.
@@ -64,19 +64,52 @@ Agents can call **tools** — functions that let them interact with external sys
 
 Each agent can use a different **model** from MaaS. The `ops_manager` might use a frontier model for complex reasoning, while subagents use a smaller, cheaper model for focused domain analysis. The `reviewer` can use an even lighter model since it only validates, not analyzes.
 
-In the next exercises, you'll explore all of these components in the codebase and then build a new specialist agent yourself.
+In the next exercises, you'll see a gap in the current team's capabilities, explore the architecture, add a specialist, and then watch the same failure get handled far better.
 
-== Exercise 1: Launch a background failure
+== Exercise 1: Launch the job and see the gap
 
-Let's start a job running so the pipeline has something to work on while we explore.
+The AI/ML team at Meridian Financial has requested Python 3.14 on their RHEL servers. Let's see how the current team handles it.
+
+=== Step 1: Launch the job
 
 . In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates**
 
-. Launch **08 Deploy Monitoring Agent** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
+. Launch **10 Install Python 3.14** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
 +
-This job deploys an application with a security context that OpenShift will reject — a different failure domain from the package issue in Module 2. Let it run in the background while we explore the architecture.
+This playbook attempts to install Python 3.14 from the standard RHEL content — but the package isn't in the default content view for this team's servers. The job will fail quickly.
 
-== Exercise 2: Explore the Athena codebase
+. Watch the job fail — you'll see an error like:
++
+----
+TASK [Install Python 3.14] ***
+fatal: [rhel-node-01]: FAILED! => {"changed": false,
+  "failures": ["No match for argument: python3.14"],
+  "msg": "Failed to install some of the specified packages",
+  "rc": 1, "results": []}
+----
+
+=== Step 2: Read the Kira ticket
+
+Wait 1-3 minutes for the pipeline to process the failure, then check the result.
+
+. In the **Kira** tab (log in with `{user}` / `{password}` if prompted), look for the new ticket — it will be routed to `sre_linux` since this is a package management failure
+
+. Read the ticket carefully. Notice what it **doesn't** contain:
++
+--
+* No mention of Meridian Financial's Satellite servers or the specific content view model used by different teams
+* No reference to the Content View Request SOP (Meridian Standard Operating Procedure v2.3)
+* No awareness that the AI/ML team needs CRB (CodeReady Builder) and EPEL to be enabled in their content view
+* No suggestion of the `#platform-satellite` fast-track escalation path
+--
++
+`sre_linux` gave a generic "check your package manager and repositories" answer. Technically accurate — but useless to anyone at Meridian. It doesn't know how your organization works.
++
+This is the gap a specialist agent closes. Let's build one.
+
+== Exercise 2: Explore the Athena architecture
+
+Before adding a new agent, let's understand what's already there.
 
 . Click the **Gitea** tab — no login required, the Athena repo is public
 +
@@ -84,7 +117,7 @@ Navigate to the **athena-aiops-deep-agent** repository. This is the source code 
 
 . Browse to `subagents.yaml` in the repository root
 +
-This is the file you saw annotated in Module 2 — it defines every specialist agent in the system:
+This is the file that defines every specialist agent in the system:
 +
 [cols="1,2",options="header"]
 |===
@@ -106,7 +139,7 @@ This is the file you saw annotated in Module 2 — it defines every specialist a
 |Quality validation — checks ticket coherence before submission
 |===
 +
-Each agent has the same structure you saw in Module 2: `description`, `model`, `system_prompt`, `tools`, and `skills`.
+Each agent has the same structure: `description`, `model`, `system_prompt`, `tools`, and `skills`. The `ops_manager` reads the `description` field to decide which agent to route a failure to.
 
 . Browse to the `skills/` directory
 +
@@ -205,110 +238,116 @@ The `skills/` directory is mounted from a PersistentVolumeClaim. You can **add n
 +
 All without writing a single line of Python. Let's do exactly that.
 
-== Exercise 4: Build a new agent — `sre_ssh`
+== Exercise 4: Add the `sre_package_management` agent
 
-Currently, when a job fails due to SSH authentication issues, the `sre_networking` agent handles it. But SSH credential failures are a specific domain that benefits from institutional knowledge — especially at Meridian Financial, where a recent policy change has deprecated shared backdoor keys.
+Currently, package management failures go to `sre_linux` — which knows the Linux ecosystem but nothing about Meridian Financial's Satellite infrastructure, content view model, or escalation paths. You're going to add a dedicated `sre_package_management` agent with a skill that encodes this institutional knowledge.
 
-You're going to create a dedicated `sre_ssh` agent with a skill that encodes this institutional knowledge.
-
-=== Step 1: Create the skill on the PVC
+=== Step 3a: Create the skill directory on the PVC
 
 . Create the skill directory:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- mkdir -p /app/skills/analyze-ssh-failure
+oc exec deployment/athena -c athena -- mkdir -p /app/skills/analyze-package-management
 ----
 
-. Download the SSH analysis skill from your Gitea repository and copy it onto the PVC:
+=== Step 3b: Download the skill and copy it to the PVC
+
+. Download the package management analysis skill from your Gitea repository and copy it directly onto the PVC:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/analyze-ssh-failure-SKILL.md \
-  | oc exec -i deployment/athena -c athena -- sh -c 'cat > /app/skills/analyze-ssh-failure/SKILL.md'
+curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/analyze-package-management-SKILL.md \
+  | oc exec -i deployment/athena -c athena -- sh -c 'cat > /app/skills/analyze-package-management/SKILL.md'
 ----
 
 . Verify the skill was created:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- head -20 /app/skills/analyze-ssh-failure/SKILL.md
+oc exec deployment/athena -c athena -- head -25 /app/skills/analyze-package-management/SKILL.md
 ----
 +
 _Sample output:_
 +
 ----
 ---
-name: analyze-ssh-failure
-description: SSH authentication failure analysis with institutional knowledge
+name: analyze-package-management-failure
+description: Package management failure analysis with Meridian Financial institutional knowledge
 ---
 
-# Analyze SSH Authentication Failure
+# Analyze Package Management Failure
 
-Deep analysis of AAP2 job failures caused by SSH authentication and credential issues.
+Deep analysis of AAP2 job failures caused by package installation, repository, or
+content view issues on RHEL hosts.
 
-## Institutional Knowledge — Meridian Financial SSH Policy
+## Institutional Knowledge — Meridian Financial Satellite Infrastructure
 
-**CRITICAL CONTEXT (Q4 2025 Policy Change):**
+**Satellite Infrastructure:**
+- Primary: satellite-primary.meridian.internal (RHEL 9 content)
+- Sync schedule: Tuesdays 02:00 UTC
 
-In late 2025, Meridian Financial deprecated all shared "backdoor" SSH keys
-in favor of per-host, per-user key pairs managed through AAP2 credentials.
+**Content View Model (per-team):**
+- base-rhel9: All RHEL servers — core OS packages only
+- ops-tooling: SRE team — monitoring, diagnostic tools
+- aiml-workloads: AI/ML team — Python 3.11+, CUDA, data science libs (CRB + EPEL enabled)
 ...
 ----
 +
-This is the tribal knowledge that makes this agent smarter than a generic SSH troubleshooter — it knows about Meridian's specific policy change.
+This is the tribal knowledge that makes this agent smarter than the generic `sre_linux`: it knows about Meridian's Satellite servers, which content view belongs to which team, the SOP for requesting content view changes, and the fast-track escalation channel.
 
-=== Step 2: Update the ConfigMap with the new agent
+=== Step 3c: Update the ConfigMap with the new agent definition
 
-Here's what the new `sre_ssh` agent entry looks like:
+Here's what the new `sre_package_management` agent entry looks like:
 
 [source,yaml]
 ----
-sre_ssh:
+sre_package_management:
   description: > # <1>
-    SSH and authentication specialist. Delegate SSH credential failures:
-    key rejection, permission denied (publickey), backdoor key deprecation,
-    authorized_keys issues, and AAP2 credential misconfiguration.
+    Package management specialist. Delegate all package installation failures:
+    dnf/yum errors, missing packages, Satellite content view gaps, EPEL/CRB
+    requirements, repository sync issues, and content view request escalation.
   model: claude-sonnet-4-6 # <2>
   system_prompt: | # <3>
-    You are a senior SRE specializing in SSH authentication and credential
-    management. You receive incident data from failed AAP2 jobs and perform
-    root-cause analysis on SSH-related failures.
+    You are a senior SRE specializing in Red Hat package management and Satellite
+    content delivery. You receive incident data from failed AAP2 jobs and perform
+    root-cause analysis on package-related failures.
 
     Always:
     - Read the incident context (incident.json) first
-    - Check the AAP2 credential name used by the failing job
-    - Determine if a deprecated backdoor key is involved
-    - Reference the analyze-ssh-failure skill for institutional knowledge
-    - Provide specific, actionable recommendations for credential remediation
+    - Identify the exact package(s) that failed to install
+    - Determine which team's content view is involved (check host group)
+    - Reference the analyze-package-management skill for Meridian-specific knowledge
+    - Check whether CRB or EPEL is needed and whether the team's content view includes it
+    - Provide the SOP reference and escalation path for content view requests
 
     Use the create-ticket skill to structure your analysis as a TicketPayload.
-    Set area to "networking" for all SSH-domain issues.
+    Set area to "linux" for all package management issues.
   tools: # <4>
     - web_search
   skills: # <5>
-    - ./skills/analyze-ssh-failure/
+    - ./skills/analyze-package-management/
     - ./skills/create-ticket/
     - ./skills/common/
 ----
-<1> **Description** — the `ops_manager` reads this to decide when to route a failure to this agent. Mentioning "SSH", "credential", "publickey", and "backdoor" ensures SSH-related failures get routed here instead of to `sre_networking`
+<1> **Description** — the `ops_manager` reads this to decide when to route a failure here. Mentioning "package installation", "dnf/yum", "Satellite", "content view", and "EPEL/CRB" ensures package failures get routed here instead of to `sre_linux`
 <2> **Model** — using `claude-sonnet-4-6` for strong reasoning. For a cost-sensitive deployment, you could use a smaller model
-<3> **System prompt** — instructs the agent to check for deprecated backdoor keys and reference the skill for institutional knowledge
-<4> **Tools** — `web_search` lets the agent look up SSH documentation if needed
+<3> **System prompt** — instructs the agent to identify team content view gaps and reference the skill for institutional knowledge
+<4> **Tools** — `web_search` lets the agent look up package availability or upstream documentation if needed
 <5> **Skills** — points to the skill you just created, plus the shared `create-ticket` and `common` skills
 
-Rather than manually editing YAML in a terminal editor (where a single indentation error would break the configuration), download the complete pre-built `subagents.yaml` that includes `sre_ssh`:
+Rather than manually editing YAML in a terminal editor (where a single indentation error would break the configuration), download the complete pre-built `subagents.yaml` that includes `sre_package_management`:
 
 [start=4]
 . Download the updated subagents configuration:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/subagents-with-sre-ssh.yaml \
+curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/subagents-with-sre-package-mgmt.yaml \
   -o /tmp/subagents-new.yaml
 ----
 
-. Verify the download — confirm `sre_ssh` is present:
+. Verify the download — confirm `sre_package_management` is present:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
@@ -322,13 +361,15 @@ sre_ansible:
 sre_linux:
 sre_openshift:
 sre_networking:
-sre_ssh:
+sre_package_management:
 reviewer:
 ----
 +
-Notice the new `sre_ssh:` entry between `sre_networking:` and `reviewer:`.
+Notice the new `sre_package_management:` entry between `sre_networking:` and `reviewer:`.
 
-. Patch the ConfigMap with the new `subagents.yaml`:
+=== Step 3d: Patch the ConfigMap
+
+. Apply the new `subagents.yaml` to the ConfigMap:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
@@ -348,7 +389,7 @@ NOTE: You may see a Warning about a missing `kubectl.kubernetes.io/last-applied-
 +
 This command creates a new ConfigMap definition from the downloaded file (preserving the existing `AGENTS.md`), generates the YAML with `--dry-run=client`, and pipes it to `oc apply` which updates the ConfigMap in place.
 
-=== Step 3: Roll out the change
+=== Step 3e: Roll out the change
 
 . Restart the Athena pod to pick up the new ConfigMap and skill:
 +
@@ -379,13 +420,13 @@ deployment "athena" successfully rolled out
 +
 A rolling restart is one of the most powerful primitives OpenShift and Kubernetes give you. It spins up a new pod with the updated configuration, waits for it to pass health checks, and only then terminates the old one — zero downtime. You just reconfigured an AI operations team in production with two commands and no service interruption.
 
-=== Step 4: Verify the new agent
+=== Verify the new agent
 
 . Confirm the new skill is on the PVC:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- ls /app/skills/analyze-ssh-failure/
+oc exec deployment/athena -c athena -- ls /app/skills/analyze-package-management/
 ----
 +
 _Expected output:_
@@ -394,57 +435,78 @@ _Expected output:_
 SKILL.md
 ----
 
-. Confirm `sre_ssh` is in the ConfigMap:
+. Confirm `sre_package_management` is in the ConfigMap:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc get configmap athena-agent-config -o jsonpath='{.data.subagents\.yaml}' | grep -A3 "sre_ssh"
+oc get configmap athena-agent-config -o jsonpath='{.data.subagents\.yaml}' | grep -A3 "sre_package_management"
 ----
 +
 _Expected output:_
 +
 ----
-sre_ssh:
+sre_package_management:
   description: >
-    SSH and authentication specialist. Delegate SSH credential failures:
-    key rejection, permission denied (publickey), backdoor key deprecation,
+    Package management specialist. Delegate all package installation failures:
+    dnf/yum errors, missing packages, Satellite content view gaps, EPEL/CRB
 ----
 
-== Exercise 5: Test the new agent
+== Exercise 5: Same job, better specialist
 
-Now let's trigger a failure that your new `sre_ssh` agent should handle.
+Now let's trigger the same failure that exposed the gap in Exercise 1.
 
 . In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates**
 
-. Launch **02 Ping RHEL Admin** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
+. Launch **10 Install Python 3.14** again by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
 +
-This job uses the `admin-backdoor-key` credential — a deprecated shared key that will be rejected by the target host. This is exactly the scenario your `sre_ssh` agent was designed to handle.
+Same playbook. Same RHEL host. Same error — `No match for argument: python3.14`.
 
 . Watch the job fail, then wait 1-3 minutes for the pipeline to process it
 
 . In the **Kira** tab (log in with `{user}` / `{password}` if prompted), look for the new ticket. Pay attention to:
 +
 --
-* Does the analysis mention the **deprecated backdoor key**?
-* Does it reference the **Q4 2025 policy change**?
-* Does the recommended action suggest creating a **per-host credential** instead?
+* Does the analysis identify the **AI/ML team's content view** (`aiml-workloads`) as the source of the gap?
+* Does it reference **Satellite** (`satellite-primary.meridian.internal`) and the weekly sync schedule?
+* Does it mention that the `aiml-workloads` content view requires **CRB and EPEL** to be enabled for Python 3.14?
+* Does the recommended action cite the **Content View Request SOP v2.3** and the `#platform-satellite` fast-track escalation channel?
 --
 +
-This is the power of Skills — you encoded Meridian Financial's institutional knowledge into a markdown file, and the agent used it to provide the LLM with context-aware analysis that goes beyond generic SSH troubleshooting, giving the LLM insight into Meridian's practices, in this case around SSH.
+This is the power of Skills — you encoded Meridian Financial's institutional knowledge into a markdown file, and the agent used it to provide context-aware analysis that goes far beyond generic package troubleshooting.
 +
 TIP: Use the **AI Chatbot** to ask follow-up questions about the analysis
 
 . In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), check `#support` for the notification
 
-== Exercise 6: Check the monitoring agent
+== Exercise 6: Compare the two tickets side by side
 
-While you were building your new agent, the **08 Deploy Monitoring Agent** job from Exercise 1 should have been processed by the pipeline.
+You now have two Kira tickets for the exact same job failure — `10 Install Python 3.14` — processed by two different agents.
 
-. In the **Kira** tab, look for the monitoring agent ticket — it should be an OpenShift/security context failure handled by `sre_openshift`
-
-. Compare the two tickets: the SSH failure handled by your new `sre_ssh` and the OpenShift failure handled by `sre_openshift`
+. In **Kira**, open both tickets and compare them:
 +
-This demonstrates the routing in action: two different failures, two different specialist agents, each with domain-specific analysis.
+[cols="1,1",options="header"]
+|===
+|First ticket — `sre_linux` |Second ticket — `sre_package_management`
+
+|Generic package manager advice
+|Identifies `aiml-workloads` content view gap
+
+|No Satellite context
+|References `satellite-primary.meridian.internal`
+
+|No SOP reference
+|Cites Content View Request SOP v2.3
+
+|No team routing
+|Escalates to `#platform-satellite` fast-track
+
+|No EPEL/CRB awareness
+|Specifies CRB + EPEL requirements for Python 3.14
+|===
+
+. The infrastructure was identical. The error was identical. The difference was entirely in what the agent *knew* about how Meridian Financial operates.
+
+That institutional knowledge lives in a markdown file. You added it — and extended an AI operations team — without writing any Python.
 
 == Takeaways
 
@@ -453,5 +515,5 @@ This demonstrates the routing in action: two different failures, two different s
 * Adding a new specialist agent is a 3-step process: create the skill, update the ConfigMap, restart the pod
 * Skills encode institutional knowledge in plain language — anyone who understands the domain can write them
 * The `ops_manager` automatically routes failures to the right specialist based on the agent's `description` field
-* You just extended an AI operations team without writing any Python
-
+* Same failure, same infrastructure, completely different analysis — the difference is domain expertise encoded in a skill
+* You extended an AI operations team without writing any Python
