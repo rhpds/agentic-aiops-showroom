@@ -359,13 +359,37 @@ Notice the new `sre_package_management:` entry between `sre_networking:` and `re
 
 === Step 3d: Patch the ConfigMap
 
-. Apply the new `subagents.yaml` to the ConfigMap:
+You need to update two keys in the ConfigMap: `subagents.yaml` (to add the new agent) and `AGENTS.md` (to update `ops_manager`'s routing rules so it knows to delegate package failures to `sre_package_management` instead of `sre_linux`).
+
+. Download the updated `ops_manager` routing rules:
++
+[source,bash,role="execute",subs=attributes+]
+----
+curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/agents-with-sre-package-mgmt.md \
+  -o /tmp/agents-new.md
+----
+
+. Verify the routing update — confirm `sre_package_management` appears in Domain Awareness:
++
+[source,bash,role="execute",subs=attributes+]
+----
+grep "sre_package_management\|sre_linux" /tmp/agents-new.md
+----
++
+_Expected output:_
++
+----
+- **sre_linux**: Systemd services, SELinux, filesystem/permissions (NOT package manager or Satellite — those go to sre_package_management if available)
+- **sre_package_management**: DNF/YUM errors, missing or disabled repositories, Satellite content gaps, CRB/EPEL requirements (when available)
+----
+
+. Apply both files to the ConfigMap in one command:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
 oc create configmap athena-agent-config \
   --from-file=subagents.yaml=/tmp/subagents-new.yaml \
-  --from-file=AGENTS.md=<(oc get configmap athena-agent-config -o jsonpath='{.data.AGENTS\.md}') \
+  --from-file=AGENTS.md=/tmp/agents-new.md \
   --dry-run=client -o yaml | oc apply -f -
 ----
 +
@@ -377,7 +401,7 @@ configmap/athena-agent-config configured
 +
 NOTE: You may see a Warning about a missing `kubectl.kubernetes.io/last-applied-configuration` annotation — this is safe to ignore. It only appears the first time because the ConfigMap was originally created by Helm, not `oc apply`
 +
-This command creates a new ConfigMap definition from the downloaded file (preserving the existing `AGENTS.md`), generates the YAML with `--dry-run=client`, and pipes it to `oc apply` which updates the ConfigMap in place.
+This command rebuilds the ConfigMap from both downloaded files and applies it in place. Both `subagents.yaml` (new agent definition) and `AGENTS.md` (updated routing rules) are replaced in one atomic apply.
 
 === Step 3e: Roll out the change
 
@@ -440,6 +464,22 @@ sre_package_management:
     Package management specialist. Delegate all package installation failures:
     dnf/yum errors, missing packages, Satellite content view gaps, EPEL/CRB
 ----
+
+. Confirm `ops_manager` routing rules include `sre_package_management`:
++
+[source,bash,role="execute",subs=attributes+]
+----
+oc get configmap athena-agent-config -o jsonpath='{.data.AGENTS\.md}' | grep "sre_package_management\|sre_linux"
+----
++
+_Expected output:_
++
+----
+- **sre_linux**: Systemd services, SELinux, filesystem/permissions (NOT package manager or Satellite — those go to sre_package_management if available)
+- **sre_package_management**: DNF/YUM errors, missing or disabled repositories, Satellite content gaps, CRB/EPEL requirements (when available)
+----
++
+Both the agent definition (`subagents.yaml`) and the routing rules (`AGENTS.md`) are now updated. The `ops_manager` will route package management failures to `sre_package_management` instead of `sre_linux`.
 
 == Exercise 5: Same job, better specialist
 
