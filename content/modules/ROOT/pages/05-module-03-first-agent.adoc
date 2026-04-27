@@ -66,20 +66,12 @@ Each agent can use a different **model** from MaaS. The `ops_manager` might use 
 
 In the next exercises, you'll see a gap in the current team's capabilities, explore the architecture, add a specialist, and then watch the same failure get handled far better.
 
-== Exercise 1: Launch the job and see the gap
+== Exercise 1: See the gap
 
-The AI/ML team at Meridian Financial has requested Python 3.14 on their RHEL servers. Let's see how the current team handles it.
+The AI/ML team at Meridian Financial has requested Python 3.14 on their RHEL servers. This job ran automatically when your environment was provisioned — so the ticket is already waiting for you in Kira.
 
-=== Step 1: Launch the job
+The job failed with this error:
 
-. In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates**
-
-. Launch **10 Install Python 3.14** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
-+
-This playbook attempts to install Python 3.14 from the standard RHEL content — but the package isn't in the default content view for this team's servers. The job will fail quickly.
-
-. Watch the job fail — you'll see an error like:
-+
 ----
 TASK [Install Python 3.14] ***
 fatal: [rhel-node-01]: FAILED! => {"changed": false,
@@ -88,11 +80,9 @@ fatal: [rhel-node-01]: FAILED! => {"changed": false,
   "rc": 1, "results": []}
 ----
 
-=== Step 2: Read the Kira ticket
+=== Step 1: Read the Kira ticket
 
-Wait 1-3 minutes for the pipeline to process the failure, then check the result.
-
-. In the **Kira** tab (log in with `{user}` / `{password}` if prompted), look for the new ticket — it will be routed to `sre_linux` since this is a package management failure
+. In the **Kira** tab (log in with `{user}` / `{password}` if prompted), find the open ticket for **10 Install Python 3.14**
 
 . Read the ticket carefully. Notice what it **doesn't** contain:
 +
