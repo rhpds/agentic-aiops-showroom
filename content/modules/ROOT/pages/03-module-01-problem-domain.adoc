@@ -37,7 +37,7 @@ image::aap2-step-02-nav-expanded.png[AAP2 sidebar showing Jobs and Templates,wid
 
 Click **Templates** in the sidebar.
 
-You'll see 9 numbered job templates — `01 Ping RHEL VM` through `09 System Health Check`. These represent the day-to-day automation that Meridian's SRE team runs against their infrastructure: health checks, package updates, application deployments, and compliance scans.
+You'll see 10 numbered job templates — `01 Ping RHEL VM` through `10 Install Python 3.14`. These represent the day-to-day automation that Meridian's SRE team runs against their infrastructure: health checks, package updates, application deployments, and compliance scans.
 
 Each template is wired to a playbook in Gitea. Some will succeed. Some will fail in specific, diagnosable ways — and those failures are what your AI assistant needs to handle.
 
