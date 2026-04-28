@@ -33,7 +33,7 @@ The four `sre_*` subagents are **ephemeral** — they're created on demand when 
 |Playbook errors, credential issues, execution environments, variable resolution
 
 |`sre_linux`
-|Package management, systemd, SELinux, filesystem, Satellite content
+|Systemd services, SELinux denials, filesystem/permissions
 
 |`sre_openshift`
 |Pod lifecycle, RBAC, operators, namespace/quota, security contexts
@@ -93,7 +93,7 @@ fatal: [rhel-node-01]: FAILED! => {"changed": false,
 * No suggestion of the `#platform-satellite` fast-track escalation path
 --
 +
-`sre_linux` gave a generic "check your package manager and repositories" answer. Technically accurate — but useless to anyone at Meridian. It doesn't know how your organization works.
+`sre_ansible` handled this — it saw an Ansible task failure and did its best. But it has no knowledge of package management, Satellite, or Meridian's content view model. Its answer is generic and organization-unaware.
 +
 This is the gap a specialist agent closes. Let's build one.
 
@@ -117,7 +117,7 @@ This is the file that defines every specialist agent in the system:
 |Playbook syntax, role/collection errors, credential issues, execution environments
 
 |`sre_linux`
-|Package management, systemd, SELinux, filesystem, Satellite content
+|Systemd services, SELinux denials, filesystem/permissions
 
 |`sre_openshift`
 |Pod lifecycle, image pull, RBAC, operators, namespace/quota
@@ -403,6 +403,34 @@ NOTE: You may see a Warning about a missing `kubectl.kubernetes.io/last-applied-
 +
 This command rebuilds the ConfigMap from both downloaded files and applies it in place. Both `subagents.yaml` (new agent definition) and `AGENTS.md` (updated routing rules) are replaced in one atomic apply.
 
+=== Step 3d.5: Update the error classifier skill on the PVC
+
+The `ops_manager` uses an `error-classifier` skill to identify the failure domain before routing. The version on your PVC was initialized from the image at first boot and doesn't know about the `package_management` domain yet — so even with the new agent in place, the classifier would still emit `ansible` or `linux` for a dnf failure.
+
+Adding a new domain to the classifier is the same as teaching a team lead a new category of problem. You're telling it: "when you see 'No package X available', that's a package management issue, not an Ansible issue."
+
+. Download the updated error-classifier skill:
++
+[source,bash,role="execute",subs=attributes+]
+----
+curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/error-classifier-with-package-mgmt-SKILL.md \
+  | oc exec -i deployment/athena -c athena -- sh -c 'cat > /app/skills/error-classifier/SKILL.md'
+----
+
+. Verify the classifier now includes the `package_management` domain:
++
+[source,bash,role="execute",subs=attributes+]
+----
+oc exec deployment/athena -c athena -- grep "Package Management\|package_management" /app/skills/error-classifier/SKILL.md
+----
++
+_Expected output:_
++
+----
+   - **Package Management**: dnf/yum errors, "No match for argument", "No package X available", missing or disabled repositories, Satellite content gaps, CRB/EPEL requirements, subscription-manager errors
+   - `domain`: one of ansible, linux, package_management, openshift, networking
+----
+
 === Step 3e: Roll out the change
 
 . Restart the Athena pod to pick up the new ConfigMap and skill:
@@ -516,10 +544,10 @@ You now have two Kira tickets for the exact same job failure — `10 Install Pyt
 +
 [cols="1,1",options="header"]
 |===
-|First ticket — `sre_linux` |Second ticket — `sre_package_management`
+|First ticket — `sre_ansible` (pre-warmed) |Second ticket — `sre_package_management`
 
-|Generic package manager advice
-|Identifies `aiml-workloads` content view gap
+|Treated as an Ansible task failure
+|Identifies the root cause as a package gap
 
 |No Satellite context
 |References `satellite-primary.meridian.internal`
@@ -542,7 +570,7 @@ That institutional knowledge lives in a markdown file. You added it — and exte
 
 * Athena's agents and skills are defined in configuration, not code
 * OpenShift provides the extensibility mechanism: ConfigMap for agents, PVC for skills
-* Adding a new specialist agent is a 3-step process: create the skill, update the ConfigMap, restart the pod
+* Adding a new specialist agent is a 4-step process: create the skill, update the error classifier on the PVC, update the ConfigMap, restart the pod
 * Skills encode institutional knowledge in plain language — anyone who understands the domain can write them
 * The `ops_manager` automatically routes failures to the right specialist based on the agent's `description` field
 * Same failure, same infrastructure, completely different analysis — the difference is domain expertise encoded in a skill
