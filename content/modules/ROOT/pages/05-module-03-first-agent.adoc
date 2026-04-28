@@ -93,7 +93,7 @@ fatal: [rhel-node-01]: FAILED! => {"changed": false,
 * No suggestion of the `#platform-satellite` fast-track escalation path
 --
 +
-`sre_ansible` handled this — it saw an Ansible task failure and did its best. But it has no knowledge of package management, Satellite, or Meridian's content view model. Its answer is generic and organization-unaware.
+`sre_linux` gave a generic "check your package manager and repositories" answer. Technically accurate — but useless to anyone at Meridian. It doesn't know how your organization works.
 +
 This is the gap a specialist agent closes. Let's build one.
 
@@ -544,10 +544,10 @@ You now have two Kira tickets for the exact same job failure — `10 Install Pyt
 +
 [cols="1,1",options="header"]
 |===
-|First ticket — `sre_ansible` (pre-warmed) |Second ticket — `sre_package_management`
+|First ticket — `sre_linux` |Second ticket — `sre_package_management`
 
-|Treated as an Ansible task failure
-|Identifies the root cause as a package gap
+|Generic package manager advice
+|Identifies `aiml-workloads` content view gap
 
 |No Satellite context
 |References `satellite-primary.meridian.internal`
