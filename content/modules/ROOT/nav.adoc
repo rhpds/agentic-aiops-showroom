@@ -13,3 +13,6 @@
 .Wrap-up
 * xref:09-conclusion.adoc[Conclusion]
 // * xref:02-details.adoc[Details & Setup]
+
+.Bonus
+* xref:10-bonus-deep-agents-deep-dive.adoc[Deep Agents Deep Dive]
