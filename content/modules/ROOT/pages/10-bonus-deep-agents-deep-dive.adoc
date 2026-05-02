@@ -200,3 +200,167 @@ async def run_pipeline(
 The key design decision here is the *hybrid architecture*: the pipeline function is deterministic Python.
 It doesn't classify, analyze, or make decisions — it just wires things up and validates the output.
 All reasoning happens inside the agent's ReAct loop.
+
+== Skills — domain knowledge as context
+
+Skills are the most powerful and accessible extension point in the deep agent architecture.
+A skill is a markdown file that gets loaded into an agent's context — it becomes part of what the agent "knows."
+
+No code. No SDK. No compilation.
+If you can write a diagnostic runbook, you can write a skill.
+
+image::deep-dive-skills.svg[How skills flow from filesystem into agent context,align="center",link=self,width=700]
+
+=== The skills directory
+
+Each skill is a directory containing a `SKILL.md` file. Here's how they're organized in the
+link:https://github.com/rhpds/athena-aiops-deep-agent/tree/main/skills[Athena repository^]:
+
+[source]
+----
+skills/
+├── error-classifier/SKILL.md          # Routes failures to the right specialist
+├── analyze-ansible-failure/SKILL.md   # Ansible/AAP2 diagnostic workflow
+├── analyze-linux-failure/SKILL.md     # Linux host-level diagnostics
+├── analyze-openshift-failure/SKILL.md # Kubernetes/OpenShift diagnostics
+├── analyze-networking-failure/SKILL.md# Network connectivity diagnostics
+├── analyze-package-management/SKILL.md# Package manager + Satellite SOPs
+├── create-ticket/SKILL.md            # TicketPayload output schema
+├── review-ticket/SKILL.md            # Quality validation checklist
+└── common/
+    └── log-analysis/SKILL.md         # Shared log-parsing workflows
+----
+
+Skills are referenced by path in `subagents.yaml` — each specialist loads only the skills it needs:
+
+[source,yaml]
+----
+sre_linux:
+  skills:
+    - ./skills/analyze-linux-failure/    # Domain-specific diagnostics
+    - ./skills/create-ticket/            # Output schema guidance
+    - ./skills/common/                   # Shared log-parsing
+----
+
+=== The error classifier — the routing brain
+
+The
+link:https://github.com/rhpds/athena-aiops-deep-agent/blob/main/skills/error-classifier/SKILL.md[error-classifier skill^]
+is what the ops_manager uses to decide which specialist should investigate a failure.
+It maps error signals to domains:
+
+[source,markdown]
+----
+# Error Classifier
+
+Classify the failure domain from an AAP2 job failure incident.
+
+## Workflow
+
+1. **Read** the error excerpt and stdout from the incident envelope
+2. **Scan** for domain-specific signals:
+   - **Ansible**: task/role/play references, module errors, collection not found,
+     credential failures, jinja2 template errors, variable undefined.
+     NOT package manager failures — "No package X available" or dnf/yum
+     errors are package_management even when surfaced by an Ansible task
+   - **Linux**: systemd unit failures, SELinux denials (avc:),
+     permission denied on files, filesystem full/mount errors
+   - **Package Management**: dnf/yum errors, "No match for argument",
+     "No package X available", missing or disabled repositories,
+     Satellite content gaps, CRB/EPEL requirements
+   - **OpenShift/Kubernetes**: pod/container/image references,
+     CrashLoopBackOff, ImagePullBackOff, RBAC denied, namespace/quota errors
+   - **Networking**: DNS resolution failed, connection refused/timeout,
+     SSH errors, TLS/SSL certificate errors, proxy errors
+3. **Resolve** ambiguity: if signals span multiple domains, identify
+   the root cause domain. Example: "Ansible task failed because DNS
+   lookup timed out" → networking (not ansible)
+4. **Emit** classification:
+   - `domain`: one of ansible, linux, package_management, openshift, networking
+   - `delegate_to`: the exact subagent name (e.g. sre_linux)
+   - `confidence`: 0-100 based on signal strength
+   - `rationale`: one sentence explaining why this domain was chosen
+----
+
+This is the full skill — 25 lines of markdown that drive the entire routing decision.
+The ambiguity resolution rule in step 3 is critical: when an Ansible task fails because a package is missing, the root cause is _package management_, not Ansible.
+This is the kind of institutional knowledge that would otherwise live in a senior engineer's head.
+
+=== A domain skill — institutional knowledge as markdown
+
+The richest example is the
+link:https://github.com/rhpds/athena-aiops-deep-agent/blob/main/skills/analyze-package-management/SKILL.md[analyze-package-management skill^].
+It encodes Meridian Financial's Satellite infrastructure, content view architecture, and SOPs — the kind of knowledge a new hire would take weeks to absorb:
+
+[source,markdown]
+----
+# analyze-package-management
+
+You are analyzing a package management failure on a Red Hat Enterprise
+Linux host managed by Meridian Financial's Ansible Automation Platform.
+
+## Diagnostic Workflow
+
+1. Read `incident.json` — identify the exact package name and the DNF
+   error string
+2. Classify the error:
+   - `No match for argument: <package>` → package absent from all
+     enabled repos/content views
+   - `Repository 'X' is disabled` → repo exists in Satellite but not
+     enabled in this host's activation key
+   - `Failed to download metadata for repo` → Satellite reachability
+     or content sync issue
+3. Determine whether the package requires CRB, EPEL, or a custom
+   Satellite content view
+4. Select the appropriate SOP path
+
+## Meridian Financial Satellite Infrastructure
+
+- **Primary:** `satellite-primary.meridian.internal` (London DC)
+- **Replica:** `satellite-replica.meridian.internal` (Dublin DC)
+
+### Content View Architecture
+
+Content views are **per-team, per-project** — not global:
+
+- `cv-platform-rhel9` — Platform team (includes CRB, internal tooling)
+- `cv-security-rhel9` — Security team (includes CRB, SCAP tools)
+- `cv-base-rhel9` — Default for most RHEL VMs (no CRB, no EPEL)
+
+**CRB note:** CodeReady Builder is included in `cv-platform-rhel9`
+and `cv-security-rhel9` but **not** in `cv-base-rhel9`. Most RHEL VMs
+are registered to `cv-base-rhel9`, which is why packages requiring CRB
+(like `python3.14`) fail.
+
+## Common Failure Patterns
+
+| DNF Error | Root Cause | Required Action |
+|-----------|-----------|----------------|
+| `No match for argument: python3.14` | Not in cv-base-rhel9;
+  requires CRB + EPEL | Request new content view (SOP v2.3) |
+| `Repository 'epel' is disabled` | EPEL not in activation key |
+  Content view update request |
+| Package in Dev but not Prod | Content view promoted to Dev only |
+  Promote to target lifecycle environment |
+
+## SOP v2.3 — New Content View Request
+
+1. Raise ticket to Platform team: "New Content View Request"
+2. Include: project name, target lifecycle, package list, CRB/EPEL
+   requirements, business justification
+3. Standard SLA: 2 business days
+----
+
+This skill gives the agent the same knowledge a Meridian Financial SRE would have after months on the team: which Satellite servers exist, how content views are structured, why CRB packages fail on default VMs, and exactly which SOP to follow.
+
+=== Why skills matter
+
+Skills are "just markdown" — but that simplicity is the point:
+
+* **Accessible**: Anyone who can write a diagnostic runbook can create a skill. No Python, no SDK, no build step.
+* **Institutional knowledge**: Skills encode the expertise that otherwise lives in someone's head or scattered wiki pages — infrastructure-specific details, SOPs, failure pattern tables.
+* **Runtime extensible**: Skills live on a PersistentVolumeClaim in OpenShift. You can add, modify, or remove skills without rebuilding the container image or redeploying the application.
+* **Composable**: Each subagent loads a combination of skills — a domain-specific analysis skill, the shared `create-ticket` schema, and common log-parsing workflows. Different specialists get different knowledge.
+
+In Module 3, you added a new specialist by creating a skill and a subagent entry.
+That's the pattern: write the knowledge, wire the configuration, and the agent learns a new domain.
