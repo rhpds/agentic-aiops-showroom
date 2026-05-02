@@ -58,3 +58,145 @@ Athena is designed to be extended without changing Python code:
 
 Skills are the most accessible of the three — anyone who can write a diagnostic runbook can create a skill.
 We'll look at each of these in detail.
+
+== The orchestrator — ops_manager
+
+The ops_manager is created by a single function call, and the entire pipeline runs through `run_pipeline()`.
+Here's how the pieces fit together — deterministic Python handles the API plumbing, while the LLM handles reasoning.
+
+image::deep-dive-pipeline.svg[Pipeline data flow — blue is deterministic Python and orange is LLM reasoning,align="center",link=self,width=700]
+
+=== Creating the agent
+
+The `create_ops_manager()` function in
+link:https://github.com/rhpds/athena-aiops-deep-agent/blob/main/athena/agents/pipeline.py#L79-L90[pipeline.py^]
+wires together the deep agent from its component parts:
+
+[source,python]
+----
+def create_ops_manager(settings: Settings):
+    """Create the ops_manager Deep Agent configured by filesystem files."""
+    return create_deep_agent(
+        model=_make_maas_model(                                    # <1>
+            os.environ.get("OPS_MANAGER_MODEL", "claude-sonnet-4-6")
+        ),
+        memory=["./AGENTS.md"],                                    # <2>
+        tools=[],                                                  # <3>
+        subagents=load_subagents(PROJECT_DIR / "subagents.yaml"),  # <4>
+        backend=FilesystemBackend(root_dir=PROJECT_DIR),           # <5>
+    )
+----
+<1> The LLM model — routed through the MaaS gateway (Red Hat OpenShift AI)
+<2> The agent's persona and triage protocol — loaded from `AGENTS.md` as persistent memory
+<3> No direct tools — the manager delegates rather than acting directly
+<4> Specialist subagents loaded from YAML configuration
+<5> Filesystem backend — agents read `incident.json` and write artifacts to disk
+
+Notice what's _not_ in the code: no hardcoded prompts, no agent routing logic, no domain knowledge.
+The manager's entire persona comes from `AGENTS.md`, and the specialists come from `subagents.yaml`.
+Change either file and the agent changes — no Python modification required.
+
+=== Loading subagents from YAML
+
+The
+link:https://github.com/rhpds/athena-aiops-deep-agent/blob/main/athena/agents/pipeline.py#L30-L56[load_subagents()^]
+function reads `subagents.yaml` and resolves tool references:
+
+[source,python]
+----
+def load_subagents(config_path: Path) -> list[dict]:
+    """Load subagent definitions from YAML and resolve tool references."""
+    available_tools = {
+        "web_search": web_search,                               # <1>
+    }
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+
+    subagents = []
+    for name, spec in config.items():
+        subagent = {
+            "name": name,
+            "description": spec["description"],                 # <2>
+            "system_prompt": spec["system_prompt"],
+        }
+        if "model" in spec:
+            model_name = (
+                spec["model"].split(":")[-1]
+                if ":" in spec["model"]
+                else spec["model"]
+            )
+            subagent["model"] = _make_maas_model(model_name)    # <3>
+        if "tools" in spec:
+            subagent["tools"] = [                                # <4>
+                available_tools[t] for t in spec["tools"]
+            ]
+        if "skills" in spec:
+            subagent["skills"] = spec["skills"]                 # <5>
+        subagents.append(subagent)
+
+    return subagents
+----
+<1> Tool registry — maps string names in YAML to actual Python functions
+<2> The description is what the manager reads to decide which specialist to delegate to
+<3> Each subagent can use a different model — the reviewer uses a smaller, cheaper model
+<4> Tools are resolved from string names to function references
+<5> Skills are paths — the Deep Agents framework loads the SKILL.md files at runtime
+
+=== Running the pipeline
+
+The
+link:https://github.com/rhpds/athena-aiops-deep-agent/blob/main/athena/agents/pipeline.py#L93-L183[run_pipeline()^]
+function ties it all together — write the incident to disk, invoke the agent, parse the result:
+
+[source,python]
+----
+async def run_pipeline(
+    envelope: IncidentEnvelope, settings: Settings
+) -> TicketPayload:
+    # Write incident context for agents to read
+    incident_path = PROJECT_DIR / "incident.json"
+    incident_path.write_text(
+        envelope.model_dump_json(indent=2)                      # <1>
+    )
+
+    agent = create_ops_manager(settings)
+
+    incident_summary = (                                        # <2>
+        f"A failed AAP2 job requires analysis.\n\n"
+        f"Job: {envelope.job.name} (ID: {envelope.job.id})\n"
+        f"Template: {envelope.job.template_name}\n"
+        f"Error excerpt:\n{envelope.artifacts.error_excerpt}\n\n"
+        f"Read incident.json for full context. "
+        f"Classify the failure, delegate to the right specialist, "
+        f"have the reviewer validate, and return a TicketPayload JSON."
+    )
+
+    final_message = None
+    async for chunk in agent.astream(                           # <3>
+        {"messages": [("user", incident_summary)]},
+        config={"configurable": {
+            "thread_id": f"incident-{envelope.event_id}"
+        }},
+        stream_mode="values",
+    ):
+        if "messages" in chunk:
+            messages = chunk["messages"]
+            if messages:
+                last = messages[-1]
+                if isinstance(last, AIMessage) and last.content:
+                    final_message = last
+
+    ticket_data = _extract_json(final_message.content)          # <4>
+    ticket = TicketPayload(**ticket_data)                       # <5>
+    return ticket
+----
+<1> Pydantic model serialized to JSON on disk — the agent reads this file during analysis
+<2> The prompt summarizes the incident — but the full context is in `incident.json`
+<3> Streaming execution — the agent runs its full ReAct loop (classify → delegate → review)
+<4> The agent returns natural language with embedded JSON — this extracts the JSON
+<5> Pydantic validation ensures the output matches the TicketPayload schema
+
+The key design decision here is the *hybrid architecture*: the pipeline function is deterministic Python.
+It doesn't classify, analyze, or make decisions — it just wires things up and validates the output.
+All reasoning happens inside the agent's ReAct loop.
