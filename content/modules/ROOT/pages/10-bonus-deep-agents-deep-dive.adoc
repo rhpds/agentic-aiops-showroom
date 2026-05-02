@@ -1,0 +1,60 @@
+= Bonus: Deep Agents Deep Dive
+:source-highlighter: rouge
+:icons: font
+
+This module is for developers who want to understand what's inside the AI assistant you've been working with.
+We'll walk through the architecture of Athena — the deep agent powering your AIOps pipeline — and look at the actual code that makes it work.
+
+No exercises here — just architecture diagrams, real code from the link:https://github.com/rhpds/athena-aiops-deep-agent[Athena GitHub repository^], and the design decisions behind them.
+
+== What is a deep agent?
+
+A simple agent is a single LLM invocation with tools.
+It receives a prompt, reasons about what to do, calls tools, and returns a result — all in one conversation.
+This works well for focused tasks, but breaks down when the problem requires different types of expertise.
+
+A *deep agent* separates concerns:
+
+* A **manager agent** (`ops_manager`) runs for the duration of the analysis. It holds the overall context, classifies the problem, and decides who should investigate.
+* **Specialist subagents** (`sre_linux`, `sre_ansible`, `sre_openshift`, `sre_networking`) are created on demand, each with their own skills and tools. They do the actual root-cause analysis and return a structured result.
+* Each subagent starts with *fresh context* — it sees only the incident data and its own domain skills. This prevents cross-contamination: package manager errors don't confuse the SSH failure analysis.
+
+image::deep-dive-architecture.svg[Deep agent architecture — manager with ephemeral specialists,align="center",link=self,width=700]
+
+=== The ReAct pattern
+
+The manager agent uses a *ReAct* loop — **Re**ason + **Act**:
+
+. *Read* the incident data
+. *Reason* about the failure domain (using the error-classifier skill)
+. *Act* by delegating to the right specialist (using the `task()` tool)
+. *Review* the specialist's analysis (via the reviewer subagent)
+. *Return* the final ticket
+
+This is not a rigid pipeline — the manager reasons at each step and can adjust.
+If the error classifier is uncertain, the manager notes the low confidence.
+If the reviewer escalates, the manager upgrades the risk level.
+
+=== Three extension points
+
+Athena is designed to be extended without changing Python code:
+
+[cols="1,2,2",options="header"]
+|===
+|Extension Point |What It Is |How to Extend
+
+|**Skills**
+|Markdown documents loaded as agent context — domain knowledge, diagnostic workflows, SOPs
+|Add a new `SKILL.md` file to the skills directory
+
+|**Tools**
+|Python functions the agent can call at runtime — `@tool`-decorated functions
+|Add a new function to `tools.py` and register it in `subagents.yaml`
+
+|**Subagents**
+|Specialist agents defined in YAML — each with its own model, skills, and tools
+|Add a new entry to `subagents.yaml`
+|===
+
+Skills are the most accessible of the three — anyone who can write a diagnostic runbook can create a skill.
+We'll look at each of these in detail.
