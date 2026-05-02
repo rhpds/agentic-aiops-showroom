@@ -13,12 +13,13 @@ asciidoc:
     password: deeper-agents
     openshift_api_url: "https://openshift.example.com:6443"
     openshift_console_url: https://console-openshift-console.apps.cluster-GUID.opentlc.com
+    domain: {openshift_cluster_ingress_domain}
     openshift_cluster_ingress_domain: apps.cluster-GUID.opentlc.com
-    aap2_url: https://aap-aap.apps.cluster-GUID.opentlc.com
-    aap2_username: user-GUID-agentic
-    aap2_password: replace-me
+    aap2_url: https://aap-aap.{openshift_cluster_ingress_domain}
+    aap2_username: {user}
+    aap2_password: {password}
     kira_url: https://kira-frontend-user-GUID-agentic.apps.cluster-GUID.opentlc.com
-    kira_username: user-GUID
+    kira_username: {user}
     kira_password: replace-me
     rocketchat_url: https://rocketchat-user-GUID-agentic.apps.cluster-GUID.opentlc.com
     athena_url: https://athena-user-GUID-agentic.apps.cluster-GUID.opentlc.com

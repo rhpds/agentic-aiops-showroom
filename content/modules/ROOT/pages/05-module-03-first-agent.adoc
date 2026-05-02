@@ -167,7 +167,7 @@ Using project "user-XXXXX-agentic".
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc get configmap athena-agent-config -o yaml | head -20
+oc get configmap athena-agent-config -o yaml | bat --language yaml 
 ----
 +
 _Sample output (your results may vary):_
@@ -191,13 +191,14 @@ metadata:
 +
 The ConfigMap stores two files as keys in `data:`. Each key becomes a file when mounted into the pod. This means you can **add a new agent** by updating this ConfigMap — no image rebuild needed.
 +
-TIP: Use `oc get configmap athena-agent-config -o yaml | less` to browse the entire file — you'll see the full `AGENTS.md` and `subagents.yaml` contents
+TIP: Use `oc get configmap athena-agent-config -o yaml | bat --language yaml` to browse the entire file — you'll see the full `AGENTS.md` and `subagents.yaml` contents
 
 . Inspect the **PVC** that holds the skills:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- ls /app/skills/
+oc exec deployment/athena --container athena \
+  -- ls /app/skills/
 ----
 +
 _Sample output:_
@@ -215,6 +216,8 @@ review-ticket
 ----
 +
 The `skills/` directory is mounted from a PersistentVolumeClaim. You can **add new skills** by copying files onto the PVC — again, no image rebuild needed.
+
+NOTE: Notice the `lost+found` directory? The PVC, unlike the ConfigMap, appears as a mounted filesystem to the container. You can confirm this with `oc exec deployment/athena --container athena -- df -h`, this makes it simple to add new skills without rebuilding the image, or to iterate on them.
 
 . Understand the implications:
 +
@@ -238,7 +241,8 @@ Currently, package management failures go to `sre_linux` — which knows the Lin
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- mkdir -p /app/skills/analyze-package-management
+oc exec deployment/athena --container athena \
+  -- mkdir -p /app/skills/analyze-package-management
 ----
 
 === Step 3b: Download the skill and copy it to the PVC
@@ -247,15 +251,19 @@ oc exec deployment/athena -c athena -- mkdir -p /app/skills/analyze-package-mana
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/analyze-package-management-SKILL.md \
-  | oc exec -i deployment/athena -c athena -- sh -c 'cat > /app/skills/analyze-package-management/SKILL.md'
+curl -sL \
+  {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/analyze-package-management-SKILL.md \
+  | oc exec --stdin deployment/athena --container athena \
+  -- sh -c 'cat > /app/skills/analyze-package-management/SKILL.md'
 ----
 
 . Verify the skill was created:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- head -25 /app/skills/analyze-package-management/SKILL.md
+oc exec deployment/athena --container athena \
+  -- cat /app/skills/analyze-package-management/SKILL.md \
+  | bat --language markdown
 ----
 +
 _Sample output:_
@@ -413,15 +421,19 @@ Adding a new domain to the classifier is the same as teaching a team lead a new 
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-curl -sL {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/error-classifier-with-package-mgmt-SKILL.md \
-  | oc exec -i deployment/athena -c athena -- sh -c 'cat > /app/skills/error-classifier/SKILL.md'
+curl -sL \
+  {gitea_url}/{user}/agentic-devops-plays/raw/branch/main/configs/error-classifier-with-package-mgmt-SKILL.md \
+  | oc exec --stdin deployment/athena --container athena \
+  -- sh -c 'cat > /app/skills/error-classifier/SKILL.md'
 ----
 
 . Verify the classifier now includes the `package_management` domain:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- grep "Package Management\|package_management" /app/skills/error-classifier/SKILL.md
+oc exec deployment/athena --container athena \
+  -- grep "Package Management\|package_management" \
+  /app/skills/error-classifier/SKILL.md
 ----
 +
 _Expected output:_
@@ -468,7 +480,8 @@ A rolling restart is one of the most powerful primitives OpenShift and Kubernete
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc exec deployment/athena -c athena -- ls /app/skills/analyze-package-management/
+oc exec deployment/athena --container athena \
+  -- ls /app/skills/analyze-package-management/
 ----
 +
 _Expected output:_
@@ -481,7 +494,9 @@ SKILL.md
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc get configmap athena-agent-config -o jsonpath='{.data.subagents\.yaml}' | grep -A3 "sre_package_management"
+oc get configmap athena-agent-config \
+  -o jsonpath='{.data.subagents\.yaml}' \
+  | grep -A3 "sre_package_management"
 ----
 +
 _Expected output:_
@@ -497,7 +512,9 @@ sre_package_management:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
-oc get configmap athena-agent-config -o jsonpath='{.data.AGENTS\.md}' | grep "sre_package_management\|sre_linux"
+oc get configmap athena-agent-config \
+  -o jsonpath='{.data.AGENTS\.md}' \
+  | grep "sre_package_management\|sre_linux"
 ----
 +
 _Expected output:_
