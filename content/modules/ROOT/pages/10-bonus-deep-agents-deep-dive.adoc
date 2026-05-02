@@ -364,3 +364,132 @@ Skills are "just markdown" — but that simplicity is the point:
 
 In Module 3, you added a new specialist by creating a skill and a subagent entry.
 That's the pattern: write the knowledge, wire the configuration, and the agent learns a new domain.
+
+== Tools — giving agents hands
+
+Skills give agents knowledge. Tools give agents _capabilities_ — the ability to take actions at runtime that go beyond what's in their context.
+
+In Athena, the tool surface is deliberately tiny.
+There is exactly one tool:
+link:https://github.com/rhpds/athena-aiops-deep-agent/blob/main/athena/agents/tools.py[web_search^].
+
+[source,python]
+----
+from langchain_core.tools import tool
+
+
+@tool                                                          # <1>
+def web_search(
+    query: str,                                                # <2>
+    max_results: int = 5,
+    topic: Literal["general", "news"] = "general",
+) -> dict:
+    """Search the web for documentation, CVEs, or                <3>
+    troubleshooting guides.
+
+    Args:
+        query: Specific search query (be detailed)
+        max_results: Number of results to return (default: 5)
+        topic: "general" for docs/guides,
+               "news" for recent incidents/CVEs
+
+    Returns:
+        Search results with titles, URLs, and content excerpts.
+    """
+    try:
+        from tavily import TavilyClient
+
+        api_key = os.environ.get("TAVILY_API_KEY")
+        if not api_key:
+            return {
+                "error": "TAVILY_API_KEY not set — "
+                         "web search unavailable"
+            }
+
+        client = TavilyClient(api_key=api_key)
+        return client.search(
+            query, max_results=max_results, topic=topic
+        )
+    except Exception as e:
+        return {"error": f"Search failed: {e}"}
+----
+<1> The `@tool` decorator from LangChain — it extracts the function signature and docstring to create a tool schema that the LLM can call
+<2> Typed parameters become the tool's input schema — the LLM sees these types and descriptions
+<3> The docstring becomes the tool's description — this is what the agent reads to decide _when_ to use the tool
+
+=== How tools are wired
+
+Tools are registered in `pipeline.py` by name and referenced in `subagents.yaml`:
+
+[source,python]
+----
+# In pipeline.py
+available_tools = {
+    "web_search": web_search,    # String name → function reference
+}
+----
+
+[source,yaml]
+----
+# In subagents.yaml
+sre_linux:
+  tools:
+    - web_search                 # References the string name above
+----
+
+The design decision: _one tool_.
+Domain knowledge lives in skills, not tools.
+A tool is for capabilities the agent can't get from its static context — searching the web for CVEs, checking documentation for a specific error code.
+Most of the analysis work uses the knowledge already loaded via skills.
+
+== Beyond tools — MCP
+
+The `@tool` pattern works well for tools that are part of your application — you write the function, decorate it, and the agent can call it.
+But what about tools that live _outside_ your application?
+
+The *Model Context Protocol (MCP)* is a standard for agents to discover and use tools across system boundaries.
+Think of it like USB for AI agents — a universal connector that lets an agent talk to any MCP-compatible tool server.
+
+With `@tool`, the tool function is compiled into the agent at build time.
+With MCP, an agent connects to a tool _server_ at runtime and discovers what capabilities are available — a database query server, a monitoring API, a ticketing system.
+The agent doesn't need to know about these tools in advance; it discovers them dynamically.
+
+Athena doesn't use MCP today — its single `web_search` tool is compiled in.
+But the pattern is compatible: the agent's tool interface is the same whether the tool comes from a local function or an MCP server.
+As the agent's capabilities grow beyond web search, MCP provides the architecture to connect to external services without bundling everything into one application.
+
+== Explore further
+
+To dig deeper into the code and concepts covered here:
+
+=== The Athena repository
+
+link:https://github.com/rhpds/athena-aiops-deep-agent[github.com/rhpds/athena-aiops-deep-agent^]
+
+Start with these files:
+
+[cols="1,2",options="header"]
+|===
+|File |What to Look At
+
+|`athena/agents/pipeline.py`
+|The orchestration core — `create_ops_manager()`, `run_pipeline()`, `load_subagents()`
+
+|`AGENTS.md`
+|The ops_manager's persona and triage protocol — this is the agent's "memory"
+
+|`subagents.yaml`
+|All specialist definitions — descriptions, models, skills, tools
+
+|`skills/`
+|Every domain skill — start with `error-classifier/` to understand routing, then explore the analysis skills
+
+|`athena/models.py`
+|Pydantic V2 data models — `IncidentEnvelope` (input) and `TicketPayload` (output)
+|===
+
+=== Reference reading
+
+* link:https://www.anthropic.com/research/building-effective-agents[Building Effective Agents^] — Anthropic's guide to agent architecture patterns, including the manager-specialist delegation pattern used in Athena
+* link:https://python.langchain.com/docs/[LangChain Python Documentation^] — the framework underlying the Deep Agents library
+* link:https://modelcontextprotocol.io/[Model Context Protocol^] — the specification for runtime tool discovery mentioned in the MCP section
