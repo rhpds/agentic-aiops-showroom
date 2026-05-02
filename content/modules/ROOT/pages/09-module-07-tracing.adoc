@@ -1,0 +1,161 @@
+= Module 7: Observing the Agent Pipeline
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+You've seen Athena analyze failures and create tickets.
+But what's happening inside the pipeline?
+How does ops_manager decide which specialist to call?
+What does an SRE agent actually do when it "comes to life"?
+
+In this module, you'll use LangFuse — an open-source LLM observability platform — to see exactly how the agent pipeline works, from classification through delegation to ticket creation.
+
+toc::[]
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Navigate the LangFuse trace view to understand agent execution flow
+* Identify how ops_manager classifies failures and selects specialist agents
+* Observe the lifecycle of an SRE subagent — skill loading, context reading, analysis
+* Understand model routing decisions (which model handles which task and why)
+* Read token usage and latency metrics to understand cost and performance
+
+== Open LangFuse
+
+Your environment includes a pre-configured LangFuse instance that's already wired to Athena.
+
+. Open the *LangFuse* tab in the top navigation bar
+. Log in with your credentials:
++
+[cols="1,2"]
+|===
+| Email | `{langfuse_admin_email}`
+| Password | `{langfuse_admin_password}`
+|===
+
+You should see the LangFuse dashboard with a project called *athena*.
+
+== Trigger a failure
+
+Let's generate a trace by triggering a failed AAP2 job.
+
+. Switch to the *AAP2* tab
+. Navigate to *Automation Execution → Templates*
+. Find the *10 Install Python 3.14* job template and click the launch icon
+. Wait for the job to fail (about 15 seconds)
+
+Athena will receive the failure webhook, analyze it through the agent pipeline, and create a Kira ticket — just as in earlier modules.
+But this time, every step is being traced.
+
+== Find the trace
+
+. Switch back to the *LangFuse* tab
+. Click *Traces* in the left sidebar
+. You should see a new trace appear within 30–60 seconds
++
+NOTE: The trace appears after Athena finishes processing. If you don't see it immediately, wait a moment and refresh.
+
+. Click on the trace to open the detail view
+
+== Explore the agent lifecycle
+
+The trace shows the full execution hierarchy.
+Let's walk through each layer.
+
+=== ops_manager: The coordinator
+
+The root of the trace is the `ops_manager` agent.
+This is the main orchestrator that:
+
+. Reads the incident context (`incident.json`)
+. Loads the `error-classifier` skill
+. Makes an LLM call to classify the failure domain
+. Delegates to a specialist SRE agent
+
+Look for the first LLM call — this is where ops_manager reads the error-classifier skill and determines:
+
+* *Domain*: `linux` (this is a package management issue)
+* *Confidence*: 90%+
+* *Delegate to*: `sre_linux`
+
+=== sre_linux: The specialist comes to life
+
+Expand the `task` tool call that delegates to `sre_linux`.
+Inside, you'll see a new agent generation — the SRE specialist.
+
+Watch its lifecycle:
+
+. *Skill loading*: `read_file` calls to `skills/analyze-linux-failure/SKILL.md` — this skill guides the agent's analysis approach
+. *Context reading*: `read_file` call to `incident.json` — the agent reads the same incident data ops_manager received
+. *Root cause analysis*: One or more LLM calls where the agent reasons about the failure
+. *Formatted output*: A final LLM call producing structured analysis
+
+This is the core of the Deep Agents pattern — each specialist loads domain-specific skills that guide its reasoning, then applies that expertise to the incident.
+
+=== reviewer: Quality gate
+
+After the SRE specialist returns its analysis, ops_manager delegates to the `reviewer` agent.
+
+Notice:
+
+* The reviewer uses *claude-3-5-haiku* — a faster, cheaper model
+* Its job is validation, not analysis — checking coherence, completeness, and actionability
+* This is a cost optimization: expensive reasoning models for analysis, cheap models for review
+
+=== Final output
+
+The last LLM call in the ops_manager trace produces the `TicketPayload` JSON — the structured data that becomes a Kira ticket.
+
+Expand it to see the complete payload: title, description, area, confidence, risk, recommended action, affected systems, and skills.
+
+== Key observations
+
+Take a moment to examine these aspects of the trace:
+
+=== Token usage
+
+Each LLM call shows input and output token counts.
+
+* How many total tokens does a single incident analysis consume?
+* Which agent uses the most tokens?
+* How does the reviewer's token usage compare to the specialist's?
+
+=== Latency
+
+The trace timeline shows how long each step takes.
+
+* What's the total pipeline duration?
+* Which step takes the longest? (Usually the specialist RCA)
+* How much time is spent on tool calls vs. LLM reasoning?
+
+=== Model routing
+
+Different agents use different models:
+
+* `ops_manager` and `sre_linux`: *claude-sonnet-4-6* (capable reasoning)
+* `reviewer`: *claude-3-5-haiku* (fast validation)
+
+This is intentional — match model capability to task complexity.
+
+=== Skill-driven behavior
+
+The `read_file` tool calls to `skills/*/SKILL.md` files are how Deep Agents load domain expertise.
+Each skill is a markdown document that guides the agent's reasoning approach.
+
+Without skills, the agent would rely on general knowledge.
+With skills, it follows a structured analysis methodology specific to the failure domain.
+
+== Summary
+
+In this module, you explored the inner workings of the Athena agent pipeline using LangFuse traces.
+You saw how:
+
+* *ops_manager* coordinates the pipeline — classifying, delegating, reviewing, and producing output
+* *Specialist SREs* load domain skills and apply structured analysis
+* *The reviewer* validates quality using a cheaper model
+* *Token usage and latency* reveal the cost and performance profile of the pipeline
+* *Skills* are the mechanism that gives each agent domain expertise
+
+This observability layer is essential for understanding, debugging, and optimizing agentic systems in production.
