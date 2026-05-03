@@ -19,7 +19,7 @@ A *deep agent* separates concerns:
 * **Specialist subagents** (`sre_linux`, `sre_ansible`, `sre_openshift`, `sre_networking`) are created on demand, each with their own skills and tools. They do the actual root-cause analysis and return a structured result.
 * Each subagent starts with *fresh context* — it sees only the incident data and its own domain skills. This prevents cross-contamination: package manager errors don't confuse the SSH failure analysis.
 
-image::deep-dive-architecture.svg[Deep agent architecture — manager with ephemeral specialists,align="center",link=self,width=700]
+image::deep-dive-architecture.svg[Deep agent architecture — manager with ephemeral specialists,link=self,width=100%]
 
 === The ReAct pattern
 
@@ -64,7 +64,7 @@ We'll look at each of these in detail.
 The ops_manager is created by a single function call, and the entire pipeline runs through `run_pipeline()`.
 Here's how the pieces fit together — deterministic Python handles the API plumbing, while the LLM handles reasoning.
 
-image::deep-dive-pipeline.svg[Pipeline data flow — blue is deterministic Python and orange is LLM reasoning,align="center",link=self,width=700]
+image::deep-dive-pipeline.svg[Pipeline data flow — blue is deterministic Python and orange is LLM reasoning,link=self,width=100%]
 
 === Creating the agent
 
@@ -209,7 +209,7 @@ A skill is a markdown file that gets loaded into an agent's context — it becom
 No code. No SDK. No compilation.
 If you can write a diagnostic runbook, you can write a skill.
 
-image::deep-dive-skills.svg[How skills flow from filesystem into agent context,align="center",link=self,width=700]
+image::deep-dive-skills.svg[How skills flow from filesystem into agent context,link=self,width=100%]
 
 === The skills directory
 
