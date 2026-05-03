@@ -25,3 +25,6 @@ asciidoc:
     athena_url: https://athena-user-GUID-agentic.apps.cluster-GUID.opentlc.com
     gitea_url: https://gitea.apps.cluster-GUID.opentlc.com
     gitea_username: user-GUID
+    langfuse_admin_email: "user@example.com"
+    langfuse_admin_password: {password}
+    litellm_available_models_list: qwen3
