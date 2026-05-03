@@ -5,7 +5,7 @@ In the previous modules, your AI agents used `claude-sonnet-4-6` — a frontier 
 
 In this module, you'll switch every agent to `qwen3-235b` — a 235-billion parameter open source model running on Red Hat OpenShift AI via MaaS. Same pipeline, same skills, same prompts — different model. Then you'll evaluate whether the results are good enough.
 
-== Exercise 1: Test an OSS model in the chatbot
+== Exercise 1: Test an Open Source model in the chatbot
 
 Before changing the pipeline, let's get a feel for how `qwen3-235b` handles SRE reasoning.
 
@@ -31,7 +31,10 @@ What is the root cause of this failure and what would you recommend?
 +
 You're comparing this against the frontier model responses you've seen in previous modules. Keep this mental benchmark as we switch the pipeline.
 
-== Exercise 2: Switch all agents to OSS
+== Exercise 2: Switch all agents to Open Source
+
+Open source models have improved dramatically — today's 235B-parameter models come very close to matching frontier quality on structured tasks, and even smaller models deliver strong results when paired with a well-designed harness and focused skills.
+That means you can get near-frontier analysis at a fraction of the cost, running entirely on your own infrastructure.
 
 Now let's swap the entire agent team to `qwen3-235b`. The process is the same as Module 3 — download a pre-built configuration and patch the ConfigMap.
 
@@ -53,7 +56,7 @@ Login successful.
 Using project "user-XXXXX-agentic".
 ----
 
-. Download the OSS model configuration:
+. Download the open source model configuration:
 +
 [source,bash,role="execute",subs=attributes+]
 ----
@@ -115,7 +118,7 @@ deployment "athena" successfully rolled out
 
 == Exercise 3: Launch two failures
 
-Now let's give the OSS-powered pipeline two different failures to analyze.
+Now let's give the open source-powered pipeline two different failures to analyze.
 
 . In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates**
 
@@ -166,20 +169,20 @@ MaaS gives you a portfolio of Open Source models. Choosing the right one for eac
 |Smallest, fastest, limited reasoning
 
 |`minimax-m2`
-|—
+|230B
 |General purpose, multilingual
 |Different architecture, worth evaluating
 |===
 
-In this lab, we use `qwen3-235b` for all agents — it's the most capable OSS model on MaaS and makes the strongest case that open source can match frontier quality. In production, you'd mix models: a larger model for the `ops_manager` (which needs to classify and delegate accurately) and smaller, cheaper models for routine specialist analysis.
+In this lab, we use `qwen3-235b` for all agents — it's the most capable open source model on MaaS and makes the strongest case that open source can come close to frontier quality. In production, you'd mix models: a larger model for the `ops_manager` (which needs to classify and delegate accurately) and smaller, cheaper models for routine specialist analysis.
 
 === The Agentic Revolution changed the equation
 
 The rise of "vibe coding" and agentic AI development has led to an increasing focus on Open Source models:
 
-* **Agentic harnesses are better at driving LLMs** — frameworks like Deep Agents don't just send a prompt and hope. They manage context windows, delegate to specialists, provide structured skills, and parse outputs. This structured approach compensates for the capability gap between frontier and OSS models
+* **Agentic harnesses are better at driving LLMs** — frameworks like Deep Agents don't just send a prompt and hope. They manage context windows, delegate to specialists, provide structured skills, and parse outputs. This structured approach compensates for the capability gap between frontier and open source models
 * **Excellent context helps smaller models** — when you give a 235B parameter model a focused system prompt, a specific skill document, and a structured incident context, it performs remarkably well. The model doesn't need to "know everything" — it just needs to reason about the specific data in front of it
-* **Skills do the heavy lifting** — your `sre_ssh` skill from Module 3 encoded institutional knowledge about Meridian's backdoor key policy. The model doesn't need to have learned this from training data — you gave it the answer as context. A 7B model could use that skill effectively
+* **Skills do the heavy lifting** — your `sre_package_management` skill from Module 3 encoded institutional knowledge about Meridian's Satellite content views and CRB requirements. The model doesn't need to have learned this from training data — you gave it the answer as context. A 7B model could use that skill effectively
 
 === Cost
 
@@ -187,7 +190,7 @@ Frontier model pricing adds up fast in an operations environment:
 
 * A single incident analysis involves multiple LLM calls: classification, specialist reasoning, review
 * At 40+ failures per week, token costs become a significant line item
-* OSS models running on your own infrastructure have a fixed compute cost — no per-token billing, no usage surprises
+* Open source models running on your own infrastructure have a fixed compute cost — no per-token billing, no usage surprises
 
 === Data sovereignty
 
@@ -197,7 +200,7 @@ Every API call to a frontier model sends your data to an external provider:
 * Credential names and configuration details are visible in error messages
 * In a regulated environment like Meridian Financial, this creates data residency risk
 
-OSS models running on MaaS keep everything within Red Hat's infrastructure — your data never leaves the platform.
+Open source models running on MaaS keep everything within Red Hat's infrastructure — your data never leaves the platform.
 
 === Security
 
@@ -220,7 +223,7 @@ The pipeline should have processed both failures by now.
 * **Overall coherence** — does the analysis read like it was written by a competent SRE?
 --
 
-. Compare these OSS-generated tickets against the frontier-generated tickets from earlier modules
+. Compare these open source-generated tickets against the frontier-generated tickets from earlier modules
 +
 --
 * Can you tell which model produced which ticket?
@@ -228,19 +231,19 @@ The pipeline should have processed both failures by now.
 * Where, if anywhere, would you still want a frontier model?
 --
 +
-TIP: Use the **AI Chatbot** with `qwen3-235b` selected to ask follow-up questions about the tickets
+TIP: Use the **AI Chatbot** with `qwen3-235b` selected to ask follow-up questions about the tickets. Feel free to experiment with the other models too and see their takes on the ticket or more general technical queries.
 
 . In the **Rocket.Chat** tab (log in with `{user}` / `{password}` if prompted), check `#support` for the notifications
 
 == Takeaways
 
-* Switching from frontier to OSS models is a configuration change — same pipeline, same skills, same prompts
+* Switching from frontier to open source models is a configuration change — same pipeline, same skills, same prompts
 * `qwen3-235b` running on MaaS provides analysis quality comparable to frontier models for structured SRE tasks
 * Agentic harnesses like Deep Agents compensate for the capability gap by providing focused context and structured workflows
 * Skills and system prompts do most of the work — the model provides the reasoning engine
-* OSS models on MaaS offer three strategic advantages:
+* Open source models on MaaS offer three strategic advantages:
 ** **Cost** — fixed infrastructure cost vs per-token billing
 ** **Data sovereignty** — your data stays within your infrastructure
 ** **Security** — no external API keys, no egress traffic, complete audit trail
-* The choice between frontier and OSS isn't binary — you can mix models per agent based on task complexity
+* The choice between frontier and open source isn't binary — you can mix models per agent based on task complexity
 

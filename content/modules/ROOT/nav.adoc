@@ -9,7 +9,6 @@
 * xref:05-module-03-first-agent.adoc[Module 3: Understanding your Agentic DevOps Team]
 * xref:06-module-04-deep-agents.adoc[Module 4: Open Source Models]
 * xref:07-module-05-compliance-loop.adoc[Module 5: Can OSS Take Full Control?]
-* xref:09-module-07-tracing.adoc[Module 7: Observing the Agent Pipeline]
 
 .Wrap-up
 * xref:09-conclusion.adoc[Conclusion]
@@ -17,3 +16,4 @@
 
 .Bonus
 * xref:10-bonus-deep-agents-deep-dive.adoc[Deep Agents Deep Dive]
+* xref:09-module-07-tracing.adoc[Observing the Agentic AIOps Team with Tracing]

@@ -2,10 +2,10 @@
 
 Welcome to the *Agentic AI DevOps Assistant* workshop!
 
-You're a senior SRE at *Meridian Financial*, a financial services firm running hundreds of Ansible Automation Platform jobs per week across hybrid VM and OpenShift infrastructure.
+You're a senior Site Reliability Engineer (SRE) at *Meridian Financial*, a financial services firm running hundreds of Ansible Automation Platform jobs per week across hybrid VM and OpenShift infrastructure.
 Overnight job failures are piling up, compliance deadlines are looming, and the on-call team is stretched thin.
 
-Your mission: build and evolve an AI-driven incident response assistant that can triage, investigate, and help resolve infrastructure failures — so your team can focus on what matters.
+Your mission: build and evolve an AI-driven incident response assistant, or AIOps Team, that can triage, investigate, and help resolve infrastructure failures — so your team can focus on what matters. The AIOps Team should be able to handle multiple times the current volume of tickets and job failures, and should be able to do so with a fraction of the current human effort. You should also be able to swap out the models used by the AIOps Team to optimize for cost, capability, and compliance tradeoffs.
 
 [IMPORTANT]
 .Your login credentials

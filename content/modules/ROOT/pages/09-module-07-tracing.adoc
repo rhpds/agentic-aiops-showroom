@@ -1,4 +1,4 @@
-= Module 7: Observing the Agent Pipeline
+= Bonus: Observing the Agentic AIOps Team with Tracing
 :source-highlighter: rouge
 :toc: macro
 :toclevels: 1

@@ -16,7 +16,7 @@ You started this workshop as a senior SRE at Meridian Financial, drowning in fai
 |Launched a job yourself, watched it fail, and examined the full pipeline from webhook to ticket to notification; broke down the `sre_linux` subagent YAML
 
 |3 -- Your Agentic DevOps Team
-|Built and deployed a new `sre_ssh` specialist agent with institutional knowledge about Meridian's backdoor key deprecation — using ConfigMap and PVC, no code changes
+|Built and deployed a new `sre_package_management` specialist agent with institutional knowledge about Meridian's Satellite content views and CRB requirements — using ConfigMap and PVC, no code changes
 
 |4 -- Open Source Models
 |Swapped every specialist agent from `claude-sonnet-4-6` to `qwen3-235b`; evaluated OSS ticket quality against frontier; understood cost, sovereignty, and security tradeoffs
@@ -61,7 +61,7 @@ A well-designed agentic harness like Deep Agents — with focused context, speci
 
 *Skills are institutional knowledge made actionable*
 
-The `sre_ssh` skill you wrote in Module 3 encoded Meridian's specific policy about backdoor key deprecation. That knowledge was previously trapped in a runbook, a wiki page, or someone's head. Now it's part of the agent's reasoning — and it works with any model.
+The `sre_package_management` skill you wrote in Module 3 encoded Meridian's specific Satellite content view architecture and CRB/EPEL requirements. That knowledge was previously trapped in a runbook, a wiki page, or someone's head. Now it's part of the agent's reasoning — and it works with any model.
 
 *Autonomy is a spectrum, not a switch*
 
@@ -98,7 +98,10 @@ You added a new specialist agent, switched models twice, and deployed institutio
 
 == Thank you
 
-*Tony Kay, Red Hat* — Principal Architect, Agentic DevOps
+*Tony Kay, Red Hat* — AI Lead, Consulting Technical Marketing Manager
+*Burr Sutter, Red Hat* — Senior Director, Developer Experience
+*Ragu Banda, Red Hat* — Associate Principal AI Specialist SA
+*Ishu Verma, Red Hat* — Senior Principal Technical Marketing Manager
 
 *LB 2645 — Red Hat Summit 2026*
 

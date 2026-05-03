@@ -12,22 +12,22 @@ When jobs fail, a ticket lands automatically in *Kira* (Meridian's AI-assisted t
 
 This week, your manager pulled you aside: "The regulator flagged three SLA breaches in Q1. Each one traced back to a failed Ansible job that sat unactioned too long. We need to close the loop faster — and we need audit evidence that we're doing it. I want you to evaluate whether an agentic AI assistant can help."
 
-*Your assignment*: Design and progressively build an autonomous AI incident response assistant using LangChain's Deep Agents framework.
-It should triage Kira tickets, investigate Ansible Controller job failures against your VM and OpenShift infrastructure, and either resolve them or surface them to the right person — with a full, compliance-ready audit trail.
+*Your assignment*: Design and progressively build an autonomous AI incident response assistant, or AIOps Team, using LangChain's Deep Agents framework.
+It should triage Kira tickets, investigate Ansible Controller job failures against your VM and OpenShift infrastructure, and either resolve them or surface them to the right person — with a full, compliance-ready audit trail. The AIOps Team should be able to handle multiple times the current volume of tickets and job failures, and should be able to do so with a fraction of the current human effort. You should also be able to swap out the models used by the AIOps Team to optimize for cost, capability, and compliance tradeoffs.
 
-*The objective*: Demonstrate measurable MTTR reduction and improved SLA adherence for Meridian's operations team.
+*The objective*: Demonstrate measurable MTTR reduction and improved SLA adherence for Meridian's operations team, while keeping LLM token costs under control.
 
 == Success criteria for your mission
 
 By the end of this workshop, you'll have hands-on experience with agentic AI patterns applicable to real-world SRE operations:
 
 * Triage and classify Ansible Controller failures → automated ticket categorization in Kira
-* Invoke dedicated `sre_` subagents for targeted investigation → faster, more accurate root cause identification
+* Invoke dedicated `sre_*` subagents for targeted investigation → faster, more accurate root cause identification
 * Apply human-in/on/out-of-loop patterns → right escalation at the right moment, no more, no less
 * Select and configure models from Red Hat OpenShift AI MaaS (Model as a Service) → optimal cost, capability, and compliance tradeoffs
 * Generate audit-ready incident reports → compliance-friendly output for regulators, automatically
 
-*Technical outcome*: A working agentic AI assistant deployed in your OpenShift namespace, connected to AAP, Kira, and RocketChat.
+*Technical outcome*: A working agentic AIOps team deployed in your OpenShift namespace, connected to AAP, Kira, and RocketChat.
 
 *Business benefits*:
 
@@ -39,7 +39,7 @@ By the end of this workshop, you'll have hands-on experience with agentic AI pat
 == Meridian Financial's challenges
 
 *The situation*: Meridian Financial handles ~40 failure tickets per week.
-Each requires manual triage, investigation, and either remediation or escalation — averaging 45 minutes of SRE time per ticket.
+Each requires manual triage, investigation, and either remediation or escalation — averaging 45-90 minutes of SRE time per ticket depending on complexity.
 Multiply that across the team, factor in overnight failures and on-call rotations, and you have a systemic operations problem.
 
 *Regulatory context*: As a financial services firm, Meridian operates under strict change management and incident response requirements.

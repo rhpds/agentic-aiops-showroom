@@ -217,7 +217,7 @@ review-ticket
 +
 The `skills/` directory is mounted from a PersistentVolumeClaim. You can **add new skills** by copying files onto the PVC — again, no image rebuild needed.
 
-NOTE: Notice the `lost+found` directory? The PVC, unlike the ConfigMap, appears as a mounted filesystem to the container. You can confirm this with `oc exec deployment/athena --container athena -- df -h`, this makes it simple to add new skills without rebuilding the image, or to iterate on them.
+NOTE: Notice the `lost+found` directory? The PVC, unlike the ConfigMap, appears as a mounted filesystem to the container. You can confirm this with `oc exec deployment/athena --container athena -- df`, this makes it simple to add new skills without rebuilding the image, or to iterate on them.
 
 . Understand the implications:
 +
