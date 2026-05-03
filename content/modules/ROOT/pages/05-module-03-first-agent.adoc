@@ -3,6 +3,60 @@
 
 In Module 2, you watched the Deep Agents pipeline analyze a failure. Now you're going to look under the hood — understand the architecture of your AI operations team, explore how agents and skills are defined, and then build and deploy a new specialist agent yourself.
 
+But first — what kind of agent architecture are we using, and why does it matter?
+
+== From Agent 1.0 to Deep Agents
+
+First-generation AI agents — the classic ReAct (Reason + Act) pattern — work well for short, focused tasks: answer a question, call an API, summarize a document.
+But they struggle with complex, multi-step operations like incident investigation.
+Their context is limited to conversation history, which overflows on long tasks.
+As the context window fills with increasingly irrelevant history, agents enter what researchers call the "dumb zone" — the point where an agent with a 200K token context window starts acting like it has a 20K window because most of its attention is wasted on noise.
+Beyond ~100K tokens, agents repeat previous actions rather than synthesizing new plans.
+Early errors become embedded and repeatedly referenced.
+With 50+ tool calls, agents drift off-topic and forget their original objectives.
+
+LangChain's link:https://blog.langchain.com/deep-agents/[Deep Agents^] framework represents a second generation of agent architecture — sometimes called Agent 2.0.
+Instead of a single agent with a long, degrading conversation, a Deep Agent uses four architectural pillars:
+
+* **Explicit planning** — to-do lists as persistent context anchors that prevent goal drift
+* **Persistent filesystem** — a virtual workspace for saving notes, incident data, and structured artifacts outside the conversation
+* **Sub-agent spawning** — delegating complex subtasks to specialists, each with a clean context window
+* **Context isolation** — each specialist sees only what it needs, preventing cross-contamination between unrelated analyses
+
+=== Agentic harnesses
+
+Deep Agents is one example of an *agentic harness* — a framework that wraps and drives an LLM rather than letting it run unsupervised.
+Other harnesses include link:https://claude.com/claude-code[Claude Code^] (Anthropic's coding agent) and the link:https://docs.anthropic.com/en/docs/agents-and-tools/agent-sdk[Claude Agent SDK^] (for building custom agents).
+What they share: the harness manages context, tools, delegation, and output parsing.
+A well-designed harness makes smaller models perform like larger ones — which is why you can switch to open source models in Module 4 without losing quality.
+
+[cols="1,2,2",options="header"]
+|===
+|Dimension |Agent 1.0 (ReAct) |Agent 2.0 (Deep Agent)
+
+|**Best for**
+|Short, focused tasks
+|Multi-step projects
+
+|**Context**
+|Conversation history only
+|Filesystem + sub-agents
+
+|**Goal persistence**
+|Degrades over time
+|Maintained via planning
+
+|**Context isolation**
+|None — everything in one window
+|Each sub-agent gets a clean context
+|===
+
+Athena uses all four pillars.
+The `ops_manager` maintains an explicit plan (the triage protocol in `AGENTS.md`).
+Skills and incident data live on the filesystem.
+Specialist subagents are spawned on demand and destroyed after use.
+And each subagent operates in context isolation — `sre_linux` never sees the networking error that `sre_networking` is investigating.
+
 == Meet Athena — your AIOps team
 
 Athena is not a single AI agent. It's a **team** of specialized agents, orchestrated by a manager, each with its own expertise, tools, and domain knowledge.
