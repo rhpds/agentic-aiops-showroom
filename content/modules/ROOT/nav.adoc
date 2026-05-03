@@ -1,8 +1,5 @@
 * xref:index.adoc[Welcome]
 
-.Workshop
-* xref:01-overview.adoc[Overview]
-
 .Modules
 * xref:03-module-01-problem-domain.adoc[Module 1: The Problem Domain]
 * xref:04-module-02-environment.adoc[Module 2: Your First Failure]
