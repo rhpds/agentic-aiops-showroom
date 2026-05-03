@@ -194,13 +194,21 @@ Frontier model pricing adds up fast in an operations environment:
 
 === Data sovereignty
 
+Data sovereignty — keeping control over where your data is processed and stored — has moved from an abstract compliance concept to a critical strategic mandate.
+link:https://www.redhat.com/en/blog/sovereignty-emerges-defining-cloud-challenge-emea-enterprises[63% of large enterprises across EMEA^] cite sovereignty concerns as the greatest barrier to cloud adoption, and over two-thirds have identified it as a top IT priority.
+
+For AI workloads, the stakes are higher.
 Every API call to a frontier model sends your data to an external provider:
 
 * Job output logs may contain hostnames, IP addresses, and system topology
 * Credential names and configuration details are visible in error messages
-* In a regulated environment like Meridian Financial, this creates data residency risk
+* In regulated environments like Meridian Financial, this creates data residency risk under frameworks like GDPR and DORA
 
-Open source models running on MaaS keep everything within Red Hat's infrastructure — your data never leaves the platform.
+Red Hat's position is clear: link:https://www.redhat.com/en/blog/open-source-transparency-defines-future-sovereign-ai-europe[open source is the foundation of sovereign AI^].
+Open models running on your own infrastructure — via Red Hat OpenShift AI — give you the control that regulated industries require: you choose where inference runs, your data never leaves the platform, and you maintain full auditability of the AI supply chain.
+
+This isn't theoretical.
+The agents you're running right now on MaaS process Meridian's job output locally — no external API calls, no data leaving your environment.
 
 === Security
 

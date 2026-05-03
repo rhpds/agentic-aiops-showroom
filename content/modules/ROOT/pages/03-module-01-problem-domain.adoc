@@ -151,9 +151,21 @@ Everything you saw in AAP2, Kira, and Rocket.Chat was produced by this automated
 
 == The compliance angle
 
-At Meridian Financial, every action taken on a production failure must be traceable. Auditors from the Financial Conduct Authority review change management and incident response records regularly.
+At Meridian Financial, every action taken on a production failure must be traceable.
+Auditors from the Financial Conduct Authority review change management and incident response records regularly.
+Missing an SLA window doesn't just mean a late fix — it triggers regulatory penalties and mandatory remediation reports.
 
-An AI agent that acts without logging is a compliance liability. An agent that logs everything it does — and why — becomes a compliance asset. You will build the latter.
+Today, those reports are written manually — 2 to 3 hours per major incident, often reconstructed after the fact from memory and chat logs.
+An AI agent that acts without logging is a compliance liability.
+An agent that logs everything it does — the classification rationale, the specialist analysis, the confidence score, the reviewer's verdict — becomes a compliance asset.
+
+This is a theme that runs throughout the workshop:
+
+* **Module 2**: You'll see the structured `TicketPayload` that every agent produces — title, evidence, root cause, risk, confidence, recommended action. This is audit-ready output by design.
+* **Module 4**: You'll explore data sovereignty — why sending job output to external LLM providers creates regulatory risk, and how open source models on Red Hat OpenShift AI keep your data within your controlled infrastructure.
+* **Module 5**: You'll configure human-in-the-loop gates and evaluate when the agent can act autonomously vs when it needs human approval — the governance layer that regulators want to see.
+
+You will build an agent that is not just fast, but auditable.
 
 == Takeaways
 
