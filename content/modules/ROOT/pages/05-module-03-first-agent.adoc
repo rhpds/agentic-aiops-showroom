@@ -32,7 +32,7 @@ A well-designed harness makes smaller models perform like larger ones — which 
 
 [cols="1,2,2",options="header"]
 |===
-|Dimension |First Generation (ReAct) |Second Generation (Deep Agent)
+|Dimension |First Generation (ReAct Only) |Second Generation (ReAct + Harness)
 
 |**Best for**
 |Short, focused tasks
