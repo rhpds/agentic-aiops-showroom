@@ -15,7 +15,7 @@ You started this workshop as a senior SRE at Meridian Financial, drowning in fai
 |2 -- Your First Failure
 |Launched a job yourself, watched it fail, and examined the full pipeline from webhook to ticket to notification; broke down the `sre_linux` subagent YAML
 
-|3 -- Your Agentic DevOps Team
+|3 -- Your Agentic AIOps Team
 |Built and deployed a new `sre_package_management` specialist agent with institutional knowledge about Meridian's Satellite content views and CRB requirements — using ConfigMap and PVC, no code changes
 
 |4 -- Open Source Models

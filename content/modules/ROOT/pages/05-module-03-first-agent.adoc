@@ -1,4 +1,4 @@
-= Module 3: Understanding your Agentic DevOps Team
+= Module 3: Understanding your Agentic AIOps Team
 :source-highlighter: rouge
 
 In Module 2, you watched the Deep Agents pipeline analyze a failure. Now you're going to look under the hood — understand the architecture of your AI operations team, explore how agents and skills are defined, and then build and deploy a new specialist agent yourself.

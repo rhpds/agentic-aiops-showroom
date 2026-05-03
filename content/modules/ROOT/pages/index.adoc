@@ -1,6 +1,6 @@
 = LB 2645: An Agentic AI DevOps Assistant: Augmenting Incident Response
 
-Welcome to the *Agentic AI DevOps Assistant* workshop!
+Welcome to the *Agentic AIOps Assistant* workshop!
 
 [IMPORTANT]
 .Your login credentials
