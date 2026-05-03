@@ -11,9 +11,14 @@ First generation AI agents — the classic ReAct (Reason + Act) pattern — work
 But they struggle with complex, multi-step operations like incident investigation.
 Their context is limited to conversation history, which overflows on long tasks.
 As the context window fills with increasingly irrelevant history, agents enter what researchers call the "dumb zone" — the point where an agent with a 200K token context window starts acting like it has a 20K window because most of its attention is wasted on noise.
-Beyond ~100K tokens, agents repeat previous actions rather than synthesizing new plans.
-Early errors become embedded and repeatedly referenced.
 With 50+ tool calls, agents drift off-topic and forget their original objectives.
+Researchers have identified five specific failure modes:
+
+* **Context distraction** — beyond ~100K tokens, agents start repeating actions from their history rather than synthesizing new plans
+* **Context confusion** — too many tools or too much irrelevant information overwhelms the model. One study found an 8B model failed with 46 tools but succeeded with just 19
+* **Context poisoning** — early errors or hallucinations become embedded in the history and repeatedly referenced
+* **Context clash** — conflicting information across conversation turns causes contradictory assumptions, with performance dropping up to 39%
+* **Lost goals** — with ~50+ tool calls, agents drift off-topic or forget earlier objectives as the original task gets buried
 
 LangChain's link:https://blog.langchain.com/deep-agents/[Deep Agents^] framework represents a second generation of agent architecture — sometimes called Agent 2.0.
 Instead of a single agent with a long, degrading conversation, a Deep Agent uses four architectural pillars:
@@ -23,7 +28,7 @@ Instead of a single agent with a long, degrading conversation, a Deep Agent uses
 * **Sub-agent spawning** — delegating complex subtasks to specialists, each with a clean context window
 * **Context isolation** — each specialist sees only what it needs, preventing cross-contamination between unrelated analyses
 
-=== Agentic harnesses
+=== Agentic Harnesses
 
 Deep Agents is one example of an *agentic harness* — a framework that wraps and drives an LLM rather than letting it run unsupervised.
 Other harnesses include link:https://claude.com/claude-code[Claude Code^] (Anthropic's coding agent) and the link:https://docs.anthropic.com/en/docs/agents-and-tools/agent-sdk[Claude Agent SDK^] (for building custom agents).
