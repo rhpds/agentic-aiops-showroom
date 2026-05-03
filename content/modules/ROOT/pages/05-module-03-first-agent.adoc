@@ -5,9 +5,9 @@ In Module 2, you watched the Deep Agents pipeline analyze a failure. Now you're 
 
 But first — what kind of agent architecture are we using, and why does it matter?
 
-== From Agent 1.0 to Deep Agents
+== From First to Second Generation Agents
 
-First-generation AI agents — the classic ReAct (Reason + Act) pattern — work well for short, focused tasks: answer a question, call an API, summarize a document.
+First generation AI agents — the classic ReAct (Reason + Act) pattern — work well for short, focused tasks: answer a question, call an API, summarize a document.
 But they struggle with complex, multi-step operations like incident investigation.
 Their context is limited to conversation history, which overflows on long tasks.
 As the context window fills with increasingly irrelevant history, agents enter what researchers call the "dumb zone" — the point where an agent with a 200K token context window starts acting like it has a 20K window because most of its attention is wasted on noise.
@@ -32,7 +32,7 @@ A well-designed harness makes smaller models perform like larger ones — which 
 
 [cols="1,2,2",options="header"]
 |===
-|Dimension |Agent 1.0 (ReAct) |Agent 2.0 (Deep Agent)
+|Dimension |First Generation (ReAct) |Second Generation (Deep Agent)
 
 |**Best for**
 |Short, focused tasks
