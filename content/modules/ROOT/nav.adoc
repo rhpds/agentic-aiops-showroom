@@ -14,3 +14,4 @@
 .Bonus
 * xref:10-bonus-deep-agents-deep-dive.adoc[Deep Agents Deep Dive]
 * xref:09-module-07-tracing.adoc[Observing the Agentic AIOps Team with Tracing]
+* xref:11-bonus-mlflow-observability.adoc[Observability with MLflow]

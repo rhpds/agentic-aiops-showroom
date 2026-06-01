@@ -1,0 +1,181 @@
+= Bonus: Observability with MLflow
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+Throughout this workshop, you've triggered failures and waited a few minutes for tickets to appear in Kira.
+Where did that time go?
+What was the agent actually doing between receiving the webhook and creating the ticket?
+
+In this module, you'll use MLflow to look inside the agent pipeline and answer those questions — tracing every LLM call, tool invocation, and subagent delegation that happens during an incident analysis.
+
+toc::[]
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Navigate the MLflow trace UI to understand agent execution flow
+* Read the Details & Timeline view to identify where time is spent
+* Follow a subagent delegation from ops_manager through specialist analysis to reviewer
+* Understand the cost profile of an agentic pipeline — LLM reasoning vs. tool execution
+
+[TIP]
+.About MLflow
+====
+MLflow is an open-source platform for the full AI/ML lifecycle — experiment tracking, model registry, model serving, evaluation, and tracing.
+Originally built for traditional machine learning, it has expanded to cover LLM and agentic AI workflows.
+Athena uses MLflow's LangChain integration to automatically capture every pipeline execution — no code changes required.
+We'll focus on tracing in this module, but the same platform can track how your agent's performance evolves as you change models, skills, or architecture.
+====
+
+== Open MLflow and find a trace
+
+Your environment includes a pre-configured MLflow instance that's already wired to Athena.
+Every incident analysis the pipeline has performed is recorded as a trace.
+
+. Open the *MLflow* tab in the top navigation bar
+. If prompted, log in with your OpenShift credentials:
++
+[cols="1,2"]
+|===
+| Username | `{user}`
+| Password | `{password}`
+|===
+
+. You should see your experiment listed — it's named after your namespace (e.g. `user-xxxxx-agentic`)
+. Click the experiment name to see your runs
+
+Each row in the runs list is one incident analysis — one complete pipeline execution from webhook to ticket.
+
+[NOTE]
+====
+If you don't see any runs, switch to the *AAP2* tab, launch the *10 Install Python 3.14* job template, and wait about two minutes for Athena to process the failure.
+====
+
+=== The Summary view
+
+Click on a recent run to open it.
+The *Summary* tab shows high-level information:
+
+* *Trace ID* — unique identifier for this pipeline execution
+* *Latency* — total end-to-end time from receiving the incident to producing the ticket
+* *Session ID* — links back to the incident event
+
+This tells you _that_ something happened and how long it took.
+To see _what_ happened, switch to the *Details & Timeline* tab.
+
+== Details & Timeline — following the agent lifecycle
+
+This is where the trace comes to life.
+The left panel shows a *Trace breakdown* — a tree of nested spans representing every operation the pipeline performed.
+The right panel shows *Inputs/Outputs* for whichever span you select.
+
+=== Reading the timeline
+
+The trace breakdown is a nested tree:
+
+* *`model`* spans represent LLM calls — the agent reasoning about what to do
+* *`tools`* spans represent tool invocations — the agent taking action (reading files, searching, delegating)
+* Blue bars show relative duration — wider means longer
+* Spans nest inside each other: a `model` call may trigger `tools` calls, which may trigger further `model` calls
+
+Let's walk through the trace top-to-bottom, mapping each span to what the agent is actually doing.
+
+=== ops_manager: classification
+
+The trace starts with the `ops_manager` agent — the coordinator.
+
+. *First `model` call* (~2–3 seconds): ops_manager receives the incident summary and its system prompt (loaded from `AGENTS.md`).
+It decides to read the full incident context.
+. *`tools` → `read_file`*: Reading `incident.json` — the complete incident envelope with job metadata, error excerpt, and stdout.
+. *Second `model` call*: After reading the incident, ops_manager loads the `error-classifier` skill and classifies the failure domain — determining which specialist should investigate.
+
+Click the second `model` span and look at the *Outputs* panel on the right.
+You should see the classification result in the assistant's response: the domain (e.g. `linux`), confidence level, and the `delegate_to` field naming the specialist.
+
+=== The specialist comes to life
+
+After classification, ops_manager delegates to a specialist SRE agent using the `task` tool.
+This is the most interesting part of the trace.
+
+Expand the `task` tool span — inside it, you'll see an entirely new agent lifecycle:
+
+. *`tools` → `read_file`*: The specialist loading its domain skill (e.g. `skills/analyze-linux-failure/SKILL.md`).
+This is how it acquires domain expertise.
+. *`model` call*: The specialist's first reasoning step — reading the incident data through the lens of its loaded skill.
+. *`tools` → `glob`, `grep`*: The specialist searching for specific patterns in the incident data.
+. *Additional `model` calls*: Further reasoning as the specialist builds its root cause analysis.
+
+This is the Deep Agents pattern visible in the trace — a fresh agent with fresh context, loaded with domain-specific skills, reasoning about one problem.
+The specialist's spans are _nested inside_ the manager's `task` tool call.
+That nesting _is_ the delegation.
+
+=== The reviewer
+
+After the specialist returns its analysis, look for a second `task` delegation — the reviewer.
+
+Notice two things:
+
+* *Different model*: The reviewer uses a smaller, faster model (Haiku rather than Sonnet).
+Its job is validation, not analysis — checking coherence, completeness, and actionability.
+* *Shorter spans*: Fewer reasoning steps, no skill loading.
+The reviewer reads the specialist's output and makes a judgment call.
+
+This is a cost optimization: expensive reasoning models for analysis, cheap models for review.
+
+=== Final output
+
+The last `model` call in the ops_manager trace produces the `TicketPayload` JSON — the structured data that becomes a Kira ticket.
+
+Click it and expand the *Outputs* panel to see the complete payload: title, description, area, confidence, risk, recommended action, affected systems, and skills.
+This is the same data you see when you open a ticket in Kira.
+
+== What the agent actually said
+
+The *Inputs/Outputs* panel on the right side is more than a summary — it's a complete record of every message exchanged with the LLM.
+
+Click any `model` span and explore:
+
+* *Inputs → messages*: The full conversation sent to the LLM — system prompt (including loaded skills), user message, and any prior assistant messages with tool calls
+* *Outputs → choices*: The LLM's response — either natural language reasoning or a `tool_calls` array showing the agent's next action
+
+The final `model` call's output contains the TicketPayload JSON — the structured analysis that becomes a Kira ticket.
+
+Every decision the agent made — which specialist to call, what evidence to cite, what risk level to assign — is recorded here.
+This is the audit trail.
+
+== Where is the time?
+
+Look at the blue bars in the trace breakdown.
+A clear pattern emerges:
+
+* *`model` spans* (LLM reasoning): seconds each — these dominate the timeline
+* *`tools` spans* (read_file, glob, grep): milliseconds — nearly invisible on the timeline
+* *Skill loading* (read_file for SKILL.md): negligible — a few milliseconds to load the markdown
+
+The cost of an agentic pipeline — in both time and tokens — is almost entirely LLM inference.
+Tool execution is nearly free by comparison.
+
+This has practical implications:
+
+* A faster model cuts pipeline time almost proportionally
+* Adding more tools has minimal impact on latency
+* Adding more skills (which load via `read_file`) is essentially free in execution time, though they do increase the context window and therefore token cost
+
+In Module 4, you swapped models to see how open source alternatives compare.
+The trace timeline shows you _exactly_ where that model choice matters — and where it doesn't.
+
+== Summary
+
+In this module, you looked inside the Athena agent pipeline using MLflow traces.
+You saw how:
+
+* *ops_manager* coordinates the pipeline — classifying, delegating, reviewing, and producing structured output
+* *Specialist SREs* load domain skills and apply structured analysis — visible as nested spans inside the `task` delegation
+* *The reviewer* validates quality using a cheaper, faster model
+* *LLM reasoning dominates* the timeline — tool calls are nearly free
+* *The trace is a complete audit trail* — every agent decision is recorded with its full inputs and outputs
+
+As your agent evolves — new specialists, different models, additional skills — MLflow tracks how those changes affect latency, token usage, and analysis quality.
+The same experiment view can compare runs across different configurations, helping you optimize the cost and quality tradeoff as your agentic operations mature.
