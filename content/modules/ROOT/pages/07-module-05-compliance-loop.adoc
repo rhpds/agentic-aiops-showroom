@@ -103,9 +103,9 @@ Your entire pipeline — manager, specialists, and reviewer — is now running o
 
 . In the **AAP2** tab (log in with `{user}` / `{password}` if prompted), navigate to **Automation Execution -> Templates**
 
-. Launch **04 Start Web Server** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
+. Launch **05 Update System Packages** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
 +
-This is a systemd/service failure — the `sre_linux` agent will handle it.
+This is a package repository failure — the `sre_package_management` agent will handle it.
 
 . Launch **06 Verify Service DNS** by clicking the rocket icon image:aap2-rocket-icon.png[rocket icon,20]
 +

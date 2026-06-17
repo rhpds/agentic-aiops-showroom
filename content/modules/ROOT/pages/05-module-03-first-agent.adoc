@@ -161,8 +161,6 @@ This is the gap a specialist agent closes. Let's build one.
 Before adding a new agent, let's understand what's already there.
 
 . Click the **Gitea** tab — no login required, the Athena repo is public
-+
-Navigate to the **athena-aiops-deep-agent** repository. This is the source code for the Deep Agent running in your namespace.
 
 . Browse to `subagents.yaml` in the repository root
 +
