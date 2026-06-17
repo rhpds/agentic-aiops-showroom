@@ -127,7 +127,7 @@ image::tab-bar-01.png[The showroom tab bar,width=100%]
 |**AAP2**
 |Ansible Automation Platform — where automation jobs run and fail
 
-|image::kira-fullscreen-01.png[Kira,150]
+|image::kira-dashboard-fullscreen.png[Kira,150]
 |**Kira**
 |Trouble ticketing — where your AI assistant creates structured incident tickets
 
